@@ -21,6 +21,11 @@ class Profile {
 
   // Tạo phương thức từ JSON
   factory Profile.fromJson(Map<String, dynamic> json) {
+    String photo = json['photo'] ?? '';
+    if (photo.startsWith('http://127.0.0.1:8000/')) {
+      photo =
+          photo.replaceFirst('http://127.0.0.1:8000/', 'http://10.0.2.2:8000/');
+    }
     return Profile(
       email: json['email'],
       full_name: json['full_name'],

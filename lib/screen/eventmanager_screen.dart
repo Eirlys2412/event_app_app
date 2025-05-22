@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../providers/eventmanager_provider.dart';
 import '../constants/pref_data.dart';
-
+import '../widgets/theme_button.dart';
+import '../widgets/theme_selector.dart';
 
 class EventManagerHomeScreen extends StatelessWidget {
   const EventManagerHomeScreen({super.key});
@@ -13,11 +14,15 @@ class EventManagerHomeScreen extends StatelessWidget {
         title: const Text('Trang quản lý sự kiện'),
         backgroundColor: const Color(0xFF6D3CC9),
         elevation: 0,
+        actions: const [
+          ThemeButton(),
+          ThemeSelector(),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: FutureBuilder<String?>(
-          future: PrefData.getRole() , // Lấy vai trò người dùng từ PrefData
+          future: PrefData.getRole(), // Lấy vai trò người dùng từ PrefData
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(

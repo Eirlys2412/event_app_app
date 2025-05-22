@@ -7,10 +7,10 @@ import '../models/user.dart';
 
 class AuthRepository {
   final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'http://127.0.0.1:8000/api/v1',
+    baseUrl: base,
     headers: {'Content-Type': 'application/json'},
-    connectTimeout: const Duration(seconds: 5), // 5 giây cho kết nối
-    receiveTimeout: const Duration(seconds: 3), // 3 giây cho nhận phản hồi
+    connectTimeout: Duration(seconds: 10), // hoặc cao hơn
+    receiveTimeout: Duration(seconds: 15), // 3 giây cho nhận phản hồi
   ));
 
   /// LOGIN
@@ -28,13 +28,23 @@ class AuthRepository {
       print('Login response: ${response.data}');
 
       if (_isSuccessful(response)) {
-        final token = response.data['token']?['token'];
+        // Hỗ trợ lấy token nơi API có thể trả về String hoặc Map {token: String}
+        final dynamic rawToken = response.data['token'];
+        final String? token = rawToken is String
+            ? rawToken
+            : (rawToken is Map ? rawToken['token']?.toString() : null);
         final userData = response.data['user'];
+        final userId = response.data['user']['id'];
         final role = response.data['user']['role'];
+
+        print(userId);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('userId', userId);
+        // userId đã lưu trong saveLoginState()
 
         if (token != null && token.isNotEmpty) {
           await PrefData.saveLoginState(
-              token, userData); // Lưu thông tin đăng nhập
+              token, userData, userId); // Lưu thông tin đăng nhập
           return true;
         } else {
           print('Token missing or empty');
@@ -54,17 +64,30 @@ class AuthRepository {
       final response = await _dio.post(
         api_register,
         data: user.toJson(), // Chuyển đối tượng User thành JSON
+        options: Options(
+          followRedirects: false,
+          validateStatus: (status) => status != null && status < 500,
+        ),
       );
 
-      if (response.statusCode == 200) {
-        final userId = response.data['user']['id'];
-        final token = response.data['token'];
-        final role = response.data['user']['role'];
+      print("Register response: ${response.data}");
 
-        // Lưu thông tin người dùng vào SharedPreferences
-        await PrefData.saveLoginState(token, response.data['user']);
+      if (_isSuccessful(response)) {
+        final dynamic userRaw = response.data['user'];
+        final dynamic tokenRaw = response.data['token'];
 
-        return {'userId': userId, 'token': token, 'role': role};
+        if (userRaw is Map<String, dynamic>) {
+          final int userId = userRaw['id'];
+          final String role = userRaw['role'];
+          final String token = tokenRaw.toString();
+
+          // Lưu thông tin vào SharedPreferences
+          await PrefData.saveLoginState(token, userRaw, userId);
+
+          return {'userId': userId, 'token': token, 'role': role};
+        } else {
+          throw Exception("Phản hồi API không hợp lệ: user không phải Map.");
+        }
       } else {
         throw Exception(response.data['message'] ?? 'Đăng ký thất bại.');
       }

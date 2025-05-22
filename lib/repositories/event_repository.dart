@@ -2,31 +2,60 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:event_app/models/event.dart'; // Import Event model
-import 'package:event_app/constants/apilist.dart';
+import '../models/event.dart'; // Import Event model
+import '../constants/apilist.dart';
+import '../constants/pref_data.dart';
+
 class EventRepository {
-  Future<List<Event>> fetchEvents() async {
-    final url = Uri.parse(api_event);
+  Future<Map<String, String>> _getAuthHeaders() async {
     try {
-      final response = await http.get(url);
+      final token = await PrefData.getToken();
+      print(
+          'Auth token: ${token?.substring(0, 10)}...'); // Debug log - only show first 10 chars
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        if (data['success'] == true) {
-          // Chuyển đổi dữ liệu từ Map sang List<Event>
-          List<Event> events = (data['data'] as List)
-              .map((eventJson) => Event.fromJson(eventJson))
-              .toList();
-          return events;
-        } else {
-          throw Exception(data['message'] ?? 'Lỗi khi lấy danh sách sự kiện.');
-        }
-      } else {
-        throw Exception('Lỗi HTTP: ${response.statusCode}');
+      if (token == null || token.isEmpty) {
+        throw Exception('Vui lòng đăng nhập để thực hiện chức năng này');
       }
+
+      return {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
     } catch (e) {
-      throw Exception('Lỗi khi gọi API: $e');
+      print('Error getting auth headers: $e'); // Debug log
+      throw Exception('Lỗi xác thực: ${e.toString()}');
     }
   }
+
+  Future<List<Event>> fetchEvents() async {
+    final response = await http.get(Uri.parse(api_event));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final List eventsJson = data['data'] ?? [];
+      return eventsJson.map((e) => Event.fromJson(e)).toList();
+    } else {
+      throw Exception('Lỗi khi lấy danh sách sự kiện');
+    }
+  }
+
+  Future<void> createEvent(Map<String, dynamic> data) async {
+    final response = await http.post(
+      Uri.parse(api_event),
+      body: json.encode(data),
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Lỗi khi tạo sự kiện');
+    }
+  }
+
+  Future<void> deleteEvent(int id) async {
+    final response = await http.delete(Uri.parse('$api_event/$id'));
+    if (response.statusCode != 200) {
+      throw Exception('Lỗi khi xóa sự kiện');
+    }
+  }
+
+  // Có thể thêm updateEvent nếu cần
 }

@@ -4,6 +4,28 @@ import 'edit_profile_screen.dart';
 import '../constants/enum.dart';
 import '../providers/profile_provider.dart';
 
+// Sử dụng IP của emulator
+const String _baseUrl = 'http://10.0.2.2:8000/';
+
+String getFullAvatarUrl(String? avatarPath) {
+  if (avatarPath == null || avatarPath.isEmpty || avatarPath == 'null') {
+    // URL ảnh mặc định nếu không có avatar
+    return '${_baseUrl}storage/uploads/resources/default.png';
+  }
+  // Nếu đường dẫn đã là full URL, chỉ thay thế IP/localhost nếu cần
+  if (avatarPath.startsWith('http')) {
+    return avatarPath
+        .replaceFirst('127.0.0.1', '10.0.2.2')
+        .replaceFirst('localhost', '10.0.2.2');
+  }
+  // Nếu là đường dẫn tương đối bắt đầu bằng 'storage/', nối với base URL
+  if (avatarPath.startsWith('storage/')) {
+    return '$_baseUrl$avatarPath';
+  }
+  // Xử lý các trường hợp đường dẫn khác nếu có, hoặc mặc định
+  return '${_baseUrl}storage/uploads/resources/$avatarPath'; // Giả định nó nằm trong resources nếu không có 'storage/'
+}
+
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -54,9 +76,14 @@ class ProfileScreen extends ConsumerWidget {
                         radius: 55,
                         backgroundColor: colorScheme.surfaceContainerHighest,
                         backgroundImage: profileState.profile.photo.isNotEmpty
-                            ? NetworkImage(profileState.profile.photo)
+                            ? NetworkImage(getFullAvatarUrl(
+                                profileState.profile.photo)) as ImageProvider
                             : const AssetImage("assets/default_avatar.png")
                                 as ImageProvider,
+                        onBackgroundImageError: (exception, stackTrace) {
+                          print('Error loading avatar: $exception');
+                          // Fallback to default avatar on error
+                        },
                       ),
                     ),
                   ),

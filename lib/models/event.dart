@@ -1,54 +1,51 @@
 class Event {
   final int id;
   final String title;
-  final String? summary;
-  final String? description;
-  final String? resources;
-  final DateTime? timestart;
-  final DateTime? timeend;
-  final String? diadiem;
-  final int? eventTypeId;
-  final String? tags;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
+  final String description;
+  final String location;
+  final DateTime startTime;
+  final DateTime endTime;
+  final String? photo;
+  final List<Map<String, dynamic>>? resourcesData;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
   Event({
     required this.id,
     required this.title,
-    this.summary,
-    this.description,
-    this.resources,
-    this.timestart,
-    this.timeend,
-    this.diadiem,
-    this.eventTypeId,
-    this.tags,
-    this.createdAt,
-    this.updatedAt,
+    required this.description,
+    required this.location,
+    required this.startTime,
+    required this.endTime,
+    this.photo,
+    this.resourcesData,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   // json to model
   factory Event.fromJson(Map<String, dynamic> json) {
+    String photoUrl = json['photo'] ?? '';
+    // Đổi sang 10.0.2.2 cho emulator nếu là localhost hoặc 127.0.0.1
+    if (photoUrl.contains('127.0.0.1')) {
+      photoUrl = photoUrl.replaceFirst('127.0.0.1', '10.0.2.2');
+    }
+    if (photoUrl.contains('localhost')) {
+      photoUrl = photoUrl.replaceFirst('localhost', '10.0.2.2');
+    }
     return Event(
-      id: json['id'] ?? 0,
-      title: json['title'] ?? '', // Thêm giá trị mặc định cho title
-      summary: json['summary'],
-      description: json['description'],
-      resources: json['resources'],
-      timestart: json['timestart'] != null
-          ? DateTime.tryParse(json['timestart'])
+      id: json['id'] as int,
+      title: json['title'] as String,
+      description: json['description'] as String,
+      location: json['location'] as String,
+      startTime: DateTime.parse(json['start_time'] as String),
+      endTime: DateTime.parse(json['end_time'] as String),
+      photo: photoUrl.isNotEmpty ? photoUrl : null,
+      resourcesData: json['resources_data'] != null
+          ? List<Map<String, dynamic>>.from(json['resources_data'] as List)
           : null,
-      timeend:
-          json['timeend'] != null ? DateTime.tryParse(json['timeend']) : null,
-      diadiem: json['diadiem'],
-      eventTypeId: json['event_type_id'],
-      tags: json['tags'] ?? '',
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'])
-          : null,
-      updatedAt: json['updated_at'] != null
-          ? DateTime.tryParse(json['updated_at'])
-          : null,
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
     );
   }
 
@@ -57,16 +54,14 @@ class Event {
     return {
       'id': id,
       'title': title,
-      'summary': summary,
       'description': description,
-      'resources': resources,
-      'timestart': timestart?.toIso8601String(),
-      'timeend': timeend?.toIso8601String(),
-      'diadiem': diadiem,
-      'event_type_id': eventTypeId,
-      'tags': tags,
-      'created_at': createdAt?.toIso8601String(),
-      'updated_at': updatedAt?.toIso8601String(),
+      'location': location,
+      'start_time': startTime.toIso8601String(),
+      'end_time': endTime.toIso8601String(),
+      'photo': photo,
+      'resources_data': resourcesData,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
     };
   }
 }

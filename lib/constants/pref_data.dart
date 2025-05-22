@@ -80,7 +80,8 @@ class PrefData {
   }
 
   // Save login state
-  static Future<void> saveLoginState(String token, Map<String, dynamic> userData) async {
+  static Future<void> saveLoginState(
+      String token, Map<String, dynamic> userData, int userId) async {
     final prefs = await _prefs();
     await prefs.setBool(_isLoggedIn, true);
     await prefs.setString(_token, token);

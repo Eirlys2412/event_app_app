@@ -1,8 +1,12 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:event_app/models/user.dart';
 
 /// Provider lưu role của người dùng
 final userRoleProvider = StateProvider<String?>((ref) => null);
+
+/// Provider for the currently logged-in user
+final userProvider = StateProvider<User?>((ref) => null);
 
 /// Hàm lưu userId
 Future<void> saveUserId(int userId) async {

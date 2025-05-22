@@ -8,6 +8,8 @@ import '../screen/notifications_screen.dart';
 import '../screen/policy_screen.dart';
 import '../screen/login_screen.dart';
 import '../widget/drawer_custom.dart';
+import '../widgets/theme_button.dart';
+import '../widgets/theme_selector.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -15,11 +17,10 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeNotifier = ref.watch(themeProvider);
-    final isDarkMode = themeNotifier.isDarkMode;
+    final isDarkMode = themeNotifier.themeMode == ThemeMode.dark;
 
     return Scaffold(
-      drawer: const DrawerCustom(userName: '', userEmail: '', avatarUrl: ''),
-
+      drawer: DrawerCustom(),
       appBar: AppBar(
         leading: Builder(
           builder: (context) => IconButton(
@@ -31,6 +32,10 @@ class SettingsScreen extends ConsumerWidget {
         ),
         title: const Text('Cài Đặt'),
         centerTitle: true,
+        actions: const [
+          ThemeButton(),
+          ThemeSelector(),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

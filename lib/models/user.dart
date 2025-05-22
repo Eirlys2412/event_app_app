@@ -84,6 +84,12 @@ class User {
   }
 
   factory User.fromJson(Map<String, dynamic> json) {
+    String photoUrl = json['photo'] ?? '';
+    if (photoUrl.startsWith('http://127.0.0.1:8000/')) {
+      photoUrl = photoUrl.replaceFirst(
+          'http://127.0.0.1:8000/', 'http://10.0.2.2:8000/');
+    }
+
     return User(
       id: json['id'] ?? 0,
       username: json['username'] ?? '',

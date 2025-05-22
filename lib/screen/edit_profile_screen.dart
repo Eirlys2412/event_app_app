@@ -6,6 +6,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/profile_provider.dart';
 
+// Define the base URL for images
+// Sử dụng IP của emulator
+const String _baseUrl = 'http://10.0.2.2:8000/';
+
+String getFullAvatarUrl(String? avatarPath) {
+  if (avatarPath == null || avatarPath.isEmpty || avatarPath == 'null') {
+    // URL ảnh mặc định nếu không có avatar
+    return '${_baseUrl}storage/uploads/resources/default.png';
+  }
+  // Nếu đường dẫn đã là full URL, chỉ thay thế IP/localhost nếu cần
+  if (avatarPath.startsWith('http')) {
+    return avatarPath
+        .replaceFirst('127.0.0.1', '10.0.2.2')
+        .replaceFirst('localhost', '10.0.2.2');
+  }
+  // Nếu là đường dẫn tương đối bắt đầu bằng 'storage/', nối với base URL
+  if (avatarPath.startsWith('storage/')) {
+    return '$_baseUrl$avatarPath';
+  }
+  // Xử lý các trường hợp đường dẫn khác nếu có, hoặc mặc định
+  return '${_baseUrl}storage/uploads/resources/$avatarPath'; // Giả định nó nằm trong resources nếu không có 'storage/'
+}
+
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -58,15 +81,23 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         await profileNotifier.uploadAndUpdatePhoto(_avatarFile!);
       }
 
-      await profileNotifier.saveProfile();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile updated successfully!'),
-          backgroundColor: Color.fromARGB(255, 146, 157, 251),
-        ),
-      );
-      Navigator.of(context).pop();
+      await profileNotifier.saveProfile().then((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully!'),
+            backgroundColor: Color.fromARGB(255, 146, 157, 251),
+          ),
+        );
+        Navigator.of(context).pop();
+      }).catchError((err) {
+        print('Lỗi chi tiết: $err');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi khi tải hồ sơ: $err'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      });
     }
   }
 
@@ -103,13 +134,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               radius: 55,
                               backgroundColor: colorScheme.secondaryContainer,
                               backgroundImage: _avatarFile != null
-                                  ? FileImage(_avatarFile!)
-                                  : (profileState.profile.photo
-                                          .startsWith('http')
-                                      ? NetworkImage(profileState.profile.photo)
-                                      : NetworkImage(url_image +
-                                          profileState
-                                              .profile.photo)) as ImageProvider,
+                                  ? FileImage(_avatarFile!) as ImageProvider
+                                  : (profileState.profile.photo.isNotEmpty
+                                      ? NetworkImage(getFullAvatarUrl(
+                                              profileState.profile.photo))
+                                          as ImageProvider
+                                      : const AssetImage(
+                                              "assets/default_avatar.png")
+                                          as ImageProvider) as ImageProvider,
+                              onBackgroundImageError: (exception, stackTrace) {
+                                print('Error loading avatar: $exception');
+                                // Fallback to default avatar on error
+                              },
                             ),
                             Positioned(
                               bottom: 0,
