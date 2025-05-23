@@ -45,8 +45,7 @@ class EventUserProfileScreen extends ConsumerWidget {
                 CircleAvatar(
                   radius: 48,
                   backgroundImage: user.photo != null && user.photo!.isNotEmpty
-                      ? NetworkImage(getFullPhotoUrl(user.photo!))
-                          as ImageProvider
+                      ? NetworkImage(getAvatarUrl(user.photo!)) as ImageProvider
                       : const AssetImage('assets/default_avatar.png')
                           as ImageProvider,
                   onBackgroundImageError: (exception, stackTrace) {
@@ -72,21 +71,15 @@ class EventUserProfileScreen extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      ElevatedButton.icon(
+                      IconButton(
                         onPressed: () {
                           // TODO: Follow logic
                         },
-                        icon: const Icon(Icons.person_add_alt_1),
-                        label: const Text('Theo dõi'),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          // TODO: Gửi tin nhắn logic
-                        },
-                        icon: const Icon(Icons.message),
-                        label: const Text('Nhắn tin'),
+                        icon: const Icon(Icons.favorite_border,
+                            color: Colors.red, size: 32),
+                        tooltip: 'Yêu thích',
                       ),
                     ],
                   ),

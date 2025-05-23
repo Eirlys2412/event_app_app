@@ -20,16 +20,18 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../utils/url_utils.dart';
+import '../providers/detail_event_provider.dart';
 
-class EventDetailScreen extends StatefulWidget {
-  final Map<String, dynamic> event;
-  const EventDetailScreen({Key? key, required this.event}) : super(key: key);
+class EventDetailScreen extends ConsumerStatefulWidget {
+  final int eventId;
+
+  const EventDetailScreen({Key? key, required this.eventId}) : super(key: key);
 
   @override
-  State<EventDetailScreen> createState() => _EventDetailScreenState();
+  ConsumerState<EventDetailScreen> createState() => _EventDetailScreenState();
 }
 
-class _EventDetailScreenState extends State<EventDetailScreen> {
+class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
   VideoPlayerController? _videoController;
   YoutubePlayerController? _youtubeController;
   bool showGallery = false;
@@ -42,35 +44,54 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    Future.microtask(() {
+      print('Fetching detail for eventId: ${widget.eventId}');
+      ref.read(detailEventProvider(widget.eventId));
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final themeState = ref.watch(themeProvider);
+    final eventDataAsyncValue = ref.watch(detailEventProvider(widget.eventId));
 
-    return Consumer(
-      builder: (context, ref, _) {
-        final themeState = ref.watch(themeProvider);
-
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(widget.event['title'] ?? 'Chi tiết sự kiện'),
-            backgroundColor: themeState.appBarColor,
-            foregroundColor: themeState.appBarTextColor,
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          eventDataAsyncValue.when(
+            data: (event) => event.title ?? 'Chi tiết sự kiện',
+            loading: () => 'Đang tải...',
+            error: (err, stack) => 'Lỗi tải sự kiện',
           ),
-          body: ListView(
+        ),
+        backgroundColor: themeState.appBarColor,
+        foregroundColor: themeState.appBarTextColor,
+      ),
+      body: eventDataAsyncValue.when(
+        data: (eventData) {
+          print('Building EventDetailScreen with eventData: $eventData');
+          if (eventData == null) {
+            return const Center(child: Text('Không tìm thấy sự kiện'));
+          }
+          return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              MediaViewer(
-                resources: widget.event['resources_data'] as List?,
-                height: 200,
-                width: double.infinity,
-                borderRadius: 12,
-                fit: BoxFit.cover,
-                aspectRatio: 16 / 9,
-              ),
+              if (eventData.resourcesData != null &&
+                  eventData.resourcesData!.isNotEmpty)
+                MediaViewer(
+                  resources: eventData.resourcesData!,
+                  height: 200,
+                  width: double.infinity,
+                  borderRadius: 12,
+                  fit: BoxFit.cover,
+                ),
+              const SizedBox(height: 16),
+              _buildEventInfo(themeState, Theme.of(context), eventData),
+              const SizedBox(height: 16),
+              _buildActions(context, ref, themeState, eventData),
               const SizedBox(height: 24),
-              _buildEventInfo(themeState, theme),
-              const SizedBox(height: 24),
-              _buildActions(context, ref, themeState),
-              const Divider(height: 40),
               ElevatedButton.icon(
                 onPressed: () {
                   setState(() {
@@ -81,58 +102,131 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 label: Text(showGallery ? 'Ẩn ảnh sự kiện' : 'Xem ảnh sự kiện'),
               ),
               if (showGallery)
-                EventGallery(
-                  eventId: widget.event['id'] ?? 0,
-                  resources: widget.event['resources_data'] as List?,
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  child: EventGallery(
+                    eventId: eventData.id,
+                    resources: eventData.resourcesData,
+                  ),
                 ),
               const SizedBox(height: 24),
+              Text(
+                "Đánh giá sự kiện",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: themeState.primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Consumer(builder: (context, ref, _) {
+                final double initialRating = eventData.averageRating ?? 0.0;
+                final int initialVotes = eventData.totalVotes ?? 0;
+                final int eventId = eventData.id;
+
+                final voteStats = ref.watch(voteStateProvider({
+                  'type': 'event',
+                  'id': eventId,
+                  'initialRating': initialRating,
+                  'initialVotes': initialVotes,
+                }));
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RatingBar.builder(
+                      initialRating: voteStats.averageRating,
+                      minRating: 1,
+                      direction: Axis.horizontal,
+                      allowHalfRating: false,
+                      itemCount: 5,
+                      itemSize: 30,
+                      itemPadding: const EdgeInsets.symmetric(horizontal: 2),
+                      itemBuilder: (context, _) =>
+                          Icon(Icons.star, color: themeState.primaryColor),
+                      onRatingUpdate: (rating) async {
+                        try {
+                          await ref
+                              .read(voteStateProvider(
+                                  {'type': 'event', 'id': eventId}).notifier)
+                              .vote(rating.toInt());
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Cảm ơn bạn đã đánh giá!')),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Lỗi: ${e.toString()}')),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Điểm trung bình: ${voteStats.averageRating.toStringAsFixed(1)} ⭐ (${voteStats.totalVotes} lượt đánh giá)',
+                      style: TextStyle(
+                        color: themeState.primaryTextColor,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                );
+              }),
+              const SizedBox(height: 24),
               EventCommentsSection(
-                eventId: widget.event['id'] ?? 0,
-                eventTitle: widget.event['title'] ?? 'Sự kiện',
+                eventId: eventData.id,
+                eventTitle: eventData.title ?? 'Sự kiện',
               ),
             ],
-          ),
-        );
-      },
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, stack) => Center(
+          child: Text('Không thể tải chi tiết sự kiện: ${err.toString()}'),
+        ),
+      ),
     );
   }
 
-  Widget _buildEventInfo(ThemeState themeState, ThemeData theme) {
+  Widget _buildEventInfo(
+      ThemeState themeState, ThemeData theme, Detailevent eventData) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          widget.event['title'] ?? 'Chưa có tiêu đề',
+          eventData.title ?? 'Chưa có tiêu đề',
           style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
             color: themeState.primaryTextColor,
           ),
         ),
-        const SizedBox(height: 8),
-        if (widget.event['summary'] != null)
-          Text(
-            widget.event['summary']!,
-            style: theme.textTheme.bodyLarge?.copyWith(
-              fontStyle: FontStyle.italic,
-              color: themeState.secondaryTextColor,
-            ),
-          ),
         const SizedBox(height: 12),
-        if (widget.event['description'] != null)
+        if (eventData.description != null)
           Text(
-            widget.event['description']!,
+            eventData.description ?? 'Không có mô tả',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: themeState.bodyTextColor,
+            ),
+          ),
+        if (eventData.summary != null)
+          Text(
+            eventData.summary ?? 'Không có tóm tắt',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontStyle: FontStyle.italic,
+              color: themeState.secondaryTextColor,
             ),
           ),
         const SizedBox(height: 16),
         Row(
           children: [
-            Icon(Icons.access_time,
-                size: 20, color: themeState.primaryTextColor),
+            Icon(Icons.access_time, color: themeState.primaryTextColor),
             const SizedBox(width: 6),
             Text(
-              "${formatDate(widget.event['timestart'] as String?)} → ${formatDate(widget.event['timeend'] as String?)}",
+              "${formatDate(eventData.timestart)} → ${formatDate(eventData.timeend)}",
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: themeState.bodyTextColor,
               ),
@@ -143,10 +237,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         Row(
           children: [
             Icon(Icons.location_on_outlined,
-                size: 20, color: themeState.primaryTextColor),
+                color: themeState.primaryTextColor),
             const SizedBox(width: 6),
             Text(
-              widget.event['diadiem'] ?? "Chưa cập nhật",
+              eventData.diadiem ?? "Chưa cập nhật",
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: themeState.bodyTextColor,
               ),
@@ -157,8 +251,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     );
   }
 
-  Widget _buildActions(
-      BuildContext context, WidgetRef ref, ThemeState themeState) {
+  Widget _buildActions(BuildContext context, WidgetRef ref,
+      ThemeState themeState, Detailevent eventData) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -171,8 +265,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (_) => EventRegisterScreen(
-                      eventId: widget.event['id'],
-                      eventTitle: widget.event['title'],
+                      eventId: eventData.id ?? 0,
+                      eventTitle: eventData.title ?? '',
                     ),
                   ),
                 );
@@ -192,8 +286,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (_) => EventUserListScreen(
-                      eventId: widget.event['id'],
-                      eventTitle: widget.event['title'],
+                      eventId: eventData.id ?? 0,
+                      eventTitle: eventData.title ?? '',
                     ),
                   ),
                 );
@@ -209,90 +303,102 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             ),
           ],
         ),
-        const Divider(height: 30),
-        const SizedBox(height: 10),
-        Text(
-          "Đánh giá sự kiện",
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: themeState.primaryTextColor,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Consumer(builder: (context, ref, _) {
-          final vote = ref.watch(voteStateProvider(
-              {'type': 'event', 'id': widget.event['id'] ?? 0}));
+      ],
+    );
+  }
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  void _showRatingDialog(
+      BuildContext context, WidgetRef ref, int eventId, ThemeState themeState) {
+    final currentVoteStats = ref.read(voteStateProvider({
+      'type': 'event',
+      'id': eventId,
+      'initialRating': ref
+          .read(voteStateProvider({
+            'type': 'event',
+            'id': eventId,
+            'initialRating': 0.0,
+            'initialVotes': 0
+          }))
+          .averageRating,
+      'initialVotes': ref
+          .read(voteStateProvider({
+            'type': 'event',
+            'id': eventId,
+            'initialRating': 0.0,
+            'initialVotes': 0
+          }))
+          .totalVotes,
+    }));
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Đánh giá sự kiện của bạn'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               RatingBar.builder(
-                initialRating: vote.toDouble(),
+                initialRating: currentVoteStats.averageRating,
                 minRating: 1,
                 direction: Axis.horizontal,
                 allowHalfRating: false,
                 itemCount: 5,
                 itemSize: 30,
                 itemPadding: const EdgeInsets.symmetric(horizontal: 2),
-                itemBuilder: (context, _) =>
-                    Icon(Icons.star, color: themeState.primaryColor),
+                itemBuilder: (context, _) => Icon(
+                  Icons.star,
+                  color: themeState.primaryColor,
+                ),
                 onRatingUpdate: (rating) async {
+                  Navigator.pop(context);
                   try {
                     await ref
-                        .read(voteStateProvider({
-                          'type': 'event',
-                          'id': widget.event['id'] ?? 0
-                        }).notifier)
+                        .read(
+                            voteStateProvider({'type': 'event', 'id': eventId})
+                                .notifier)
                         .vote(rating.toInt());
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Cảm ơn bạn đã đánh giá!')),
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: const Text('Thành công!'),
+                            content:
+                                const Text('Cảm ơn bạn đã đánh giá sự kiện.'),
+                            actions: <Widget>[
+                              TextButton(
+                                child: const Text('Đóng'),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                },
+                              ),
+                            ],
+                          );
+                        },
                       );
                     }
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Lỗi: $e')),
+                        SnackBar(content: Text('Lỗi: ${e.toString()}')),
                       );
                     }
                   }
                 },
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Điểm trung bình: ${vote.toStringAsFixed(1)} ⭐',
-                style: TextStyle(
-                  color: themeState.primaryTextColor,
-                  fontSize: 14,
-                ),
-              ),
             ],
-          );
-        }),
-      ],
-    );
-  }
-
-  Widget _buildCommentSection(ThemeState themeState) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "Bình luận",
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: themeState.primaryTextColor,
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          "Chưa có bình luận.",
-          style: TextStyle(color: themeState.secondaryTextColor),
-        ),
-      ],
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Hủy'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -317,36 +423,27 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
   Comment? _replyingTo;
   Comment? _editingComment;
 
-  // Phương thức để xây dựng cấu trúc bình luận phân cấp
   List<Comment> _buildCommentTree(List<Comment> flatList) {
     final Map<int, Comment> commentMap = {};
     final List<Comment> rootComments = [];
 
-    // Tạo map từ id đến comment
     for (var comment in flatList) {
       commentMap[comment.id] = comment;
     }
 
-    // Xây dựng cây
     for (var comment in flatList) {
       if (comment.parentId == null) {
-        // Là bình luận gốc
         rootComments.add(comment);
       } else {
-        // Là bình luận trả lời, tìm bình luận cha và thêm vào danh sách replies của cha
         final parent = commentMap[comment.parentId];
         if (parent != null) {
-          parent.replies.add(
-              comment); // Thêm vào danh sách replies đã có sẵn trong model Comment
+          parent.replies.add(comment);
         }
-        // Nếu parent không tồn tại (lỗi dữ liệu), bỏ qua bình luận này
       }
     }
 
-    // Sắp xếp bình luận gốc theo thời gian tạo (mới nhất lên đầu)
     rootComments.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-    // Sắp xếp các replies trong từng bình luận (thường là cũ nhất lên đầu để đọc theo luồng)
     for (var root in rootComments) {
       _sortReplies(root.replies);
     }
@@ -354,7 +451,6 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
     return rootComments;
   }
 
-  // Phương thức đệ quy để sắp xếp replies
   void _sortReplies(List<Comment> replies) {
     replies.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     for (var reply in replies) {
@@ -453,7 +549,7 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
   }
 
   Widget _buildCommentItem(Comment comment) {
-    print('Building comment item for id: ${comment.id}'); // Debug line
+    print('Building comment item for id: ${comment.id}');
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: Padding(
@@ -467,11 +563,9 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
                   backgroundImage: NetworkImage(
                     (comment.user.photo != null &&
                             comment.user.photo!.isNotEmpty &&
-                            comment.user.photo !=
-                                'null') // Kiểm tra thêm 'null'
-                        ? getFullPhotoUrl(comment
-                            .user.photo!) // Sử dụng hàm getFullPhotoUrl đã sửa
-                        : 'https://ui-avatars.com/api/?name=${comment.user.full_name}', // Avatar mặc định
+                            comment.user.photo != 'null')
+                        ? getFullPhotoUrl(comment.user.photo!)
+                        : 'https://ui-avatars.com/api/?name=${comment.user.full_name}',
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -484,8 +578,7 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        comment
-                            .createdAt, // Có thể format lại thời gian nếu cần
+                        comment.createdAt,
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -494,7 +587,6 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
                     ],
                   ),
                 ),
-                // Placeholder cho nút Like
                 TextButton.icon(
                   onPressed: () {/* TODO: Implement Like functionality */},
                   icon: Icon(
@@ -564,9 +656,8 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
               Padding(
                 padding: const EdgeInsets.only(left: 16.0),
                 child: Column(
-                  children: comment.replies
-                      .map((c) => _buildCommentItem(c))
-                      .toList(), // Gọi đệ quy
+                  children:
+                      comment.replies.map((c) => _buildCommentItem(c)).toList(),
                 ),
               ),
           ],
@@ -579,9 +670,6 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
   Widget build(BuildContext context) {
     final commentState = ref.watch(
         commentListProvider({'itemId': widget.eventId, 'itemCode': 'event'}));
-
-    // Xây dựng cây bình luận từ danh sách phẳng
-    // final List<Comment> commentTree = _buildCommentTree(commentState);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -596,7 +684,7 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 300, // hoặc MediaQuery nếu muốn co dãn
+          height: 300,
           child: commentState.isEmpty
               ? const Center(child: Text('Chưa có bình luận nào'))
               : ListView.builder(
@@ -757,7 +845,6 @@ class _EventGalleryState extends ConsumerState<EventGallery> {
         var response = await request.send();
         var responseData = await response.stream.bytesToString();
 
-        // Log phản hồi đầy đủ để debug, bất kể thành công hay thất bại
         print('Upload Image Response Status: ${response.statusCode}');
         print('Upload Image Response Body: $responseData');
 
@@ -779,21 +866,17 @@ class _EventGalleryState extends ConsumerState<EventGallery> {
                 );
               }
             } else {
-              // Dữ liệu thành công nhưng cấu trúc sai
               throw Exception(
                   'Phản hồi thành công nhưng dữ liệu ảnh không đúng định dạng.');
             }
           } catch (e) {
-            // Lỗi khi parse JSON thành công
             throw Exception(
                 'Lỗi xử lý dữ liệu phản hồi từ server: ${e.toString()}');
           }
         } else {
-          // Xử lý khi status code là lỗi
           String errorMessage =
               'Lỗi khi đăng ảnh (Status: ${response.statusCode})';
           try {
-            // Thử parse response body để lấy message lỗi từ server
             var jsonResponse = json.decode(responseData);
             if (jsonResponse != null && jsonResponse['message'] != null) {
               errorMessage = jsonResponse['message'];
@@ -802,7 +885,6 @@ class _EventGalleryState extends ConsumerState<EventGallery> {
                   'Lỗi server không có thông báo cụ thể. Phản hồi: $responseData';
             }
           } catch (e) {
-            // Không parse được JSON lỗi (có thể là HTML)
             errorMessage =
                 'Lỗi server hoặc hết phiên đăng nhập. Phản hồi: $responseData';
           }
@@ -810,8 +892,7 @@ class _EventGalleryState extends ConsumerState<EventGallery> {
         }
       }
     } catch (e) {
-      // Bắt các lỗi khác (ví dụ: network error, image picking failed)
-      print('Error during image upload process: $e'); // Log lỗi chi tiết
+      print('Error during image upload process: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Lỗi: ${e.toString()}')),
@@ -882,11 +963,9 @@ class _EventGalleryState extends ConsumerState<EventGallery> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: _eventImages.length,
               itemBuilder: (context, index) {
-                // Kiểm tra nếu phần tử hiện tại là null hoặc không phải Map
                 if (_eventImages[index] == null ||
                     !(_eventImages[index] is Map)) {
                   return Container(
-                    // Hoặc SizedBox.shrink() nếu không muốn hiển thị gì
                     width: 150,
                     height: 200,
                     color: Colors.grey[200],
@@ -894,11 +973,10 @@ class _EventGalleryState extends ConsumerState<EventGallery> {
                   );
                 }
 
-                final image = _eventImages[index]; // Bây giờ chắc chắn là Map
+                final image = _eventImages[index];
 
                 if (image['url'] == null ||
                     !(image['url'] as String).startsWith('http')) {
-                  // Handles null or invalid URL for a single item
                   return Container(
                     width: 150,
                     height: 200,
@@ -909,35 +987,58 @@ class _EventGalleryState extends ConsumerState<EventGallery> {
 
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => Dialog(
+                  child: Stack(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => Dialog(
+                              child: CachedNetworkImage(
+                                imageUrl: image['url'],
+                                fit: BoxFit.contain,
+                                errorWidget: (context, url, error) =>
+                                    const Icon(Icons.error),
+                              ),
+                            ),
+                          );
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
                           child: CachedNetworkImage(
                             imageUrl: image['url'],
-                            fit: BoxFit.contain,
-                            errorWidget: (context, url, error) =>
-                                const Icon(Icons.error),
+                            width: 150,
+                            height: 200,
+                            fit: BoxFit.cover,
+                            errorWidget: (context, url, error) => Container(
+                              width: 150,
+                              height: 200,
+                              color: Colors.grey[200],
+                              child: const Icon(Icons.error),
+                            ),
                           ),
                         ),
-                      );
-                    },
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        imageUrl: image['url'],
-                        width: 150,
-                        height: 200,
-                        fit: BoxFit.cover,
-                        errorWidget: (context, url, error) => Container(
-                          width: 150,
-                          height: 200,
-                          color: Colors.grey[200],
-                          child: const Icon(Icons.error),
+                      ),
+                      Positioned(
+                        top: 4,
+                        right: 4,
+                        child: PopupMenuButton<String>(
+                          onSelected: (value) async {
+                            if (value == 'delete') {
+                              await _deleteImage(image['id']);
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Xóa ảnh'),
+                            ),
+                          ],
+                          icon: const Icon(Icons.more_vert,
+                              color: Colors.white, size: 20),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 );
               },
@@ -945,5 +1046,35 @@ class _EventGalleryState extends ConsumerState<EventGallery> {
           ),
       ],
     );
+  }
+
+  Future<void> _deleteImage(int imageId) async {
+    try {
+      final token = await PrefData.getToken();
+      final response = await http.delete(
+        Uri.parse(api_delete_image(widget.eventId, imageId)),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        setState(() {
+          _eventImages.removeWhere((img) => img['id'] == imageId);
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Xóa ảnh thành công')),
+          );
+        }
+      } else {
+        throw Exception('Lỗi khi xóa ảnh');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi: ${e.toString()}')),
+        );
+      }
+    }
   }
 }

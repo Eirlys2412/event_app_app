@@ -13,6 +13,7 @@ import '../widgets/event_card.dart';
 import '../widgets/calendar_styles.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/theme_provider.dart';
+import '../models/event.dart';
 
 class EventScreen extends ConsumerStatefulWidget {
   const EventScreen({super.key});
@@ -226,7 +227,7 @@ class _EventScreenState extends ConsumerState<EventScreen> {
         itemBuilder: (context, index) {
           print('Building event card at index $index: ${events[index]}');
           return EventCard(
-            event: events[index],
+            event: Event.fromJson(events[index]),
             themeState: themeState,
           );
         },

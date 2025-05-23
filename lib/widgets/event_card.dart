@@ -7,9 +7,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/media_viewer.dart';
 import '../utils/event_utils.dart';
 import '../screen/event_screen.dart';
+import '../models/event.dart';
 
 class EventCard extends StatelessWidget {
-  final Map<String, dynamic> event;
+  final Event event;
   final ThemeState themeState;
 
   const EventCard({
@@ -36,11 +37,8 @@ class EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final normalizedEvent = normalizeEvent(event);
-    final resources =
-        event['resources_data'] is List ? event['resources_data'] : [];
-
-    final status = getEventStatus(event['timestart'], event['timeend']);
+    final status = getEventStatus(
+        event.startTime.toIso8601String(), event.endTime.toIso8601String());
     Color statusColor;
     switch (status) {
       case 'Đã diễn ra':
@@ -61,7 +59,7 @@ class EventCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => EventDetailScreen(event: normalizedEvent),
+            builder: (_) => EventDetailScreen(eventId: event.id),
           ),
         );
       },
@@ -85,7 +83,7 @@ class EventCard extends StatelessWidget {
               height: 140,
               width: 120,
               child: MediaViewer(
-                resources: resources,
+                resources: event.resourcesData,
                 height: 140,
                 borderRadius: 12,
               ),
@@ -97,7 +95,7 @@ class EventCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      event['title'] ?? 'No title',
+                      event.title,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -132,7 +130,7 @@ class EventCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            event['diadiem'] ?? 'Không rõ địa điểm',
+                            event.location,
                             style:
                                 TextStyle(color: themeState.secondaryTextColor),
                             overflow: TextOverflow.ellipsis,
@@ -150,7 +148,8 @@ class EventCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          date_util.formatDate(event['timestart']),
+                          date_util
+                              .formatDate(event.startTime.toIso8601String()),
                           style:
                               TextStyle(color: themeState.secondaryTextColor),
                         ),

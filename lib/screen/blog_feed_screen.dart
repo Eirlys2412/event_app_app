@@ -257,7 +257,7 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
                               Row(
                                 children: [
                                   _buildInteractionButton(
-                                    icon: Icons.thumb_up_outlined,
+                                    icon: Icons.favorite_border,
                                     label: blog.countLike.toString(),
                                     themeState: themeState,
                                   ),
@@ -276,12 +276,7 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
                                     },
                                     icon: Icon(Icons.comment_outlined),
                                   ),
-                                  const SizedBox(width: 16),
-                                  _buildInteractionButton(
-                                    icon: Icons.share_outlined,
-                                    label: 'Share',
-                                    themeState: themeState,
-                                  ),
+                                
                                 ],
                               ),
                             ],

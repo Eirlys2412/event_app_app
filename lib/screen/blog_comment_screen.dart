@@ -38,6 +38,27 @@ class _BlogCommentScreenState extends ConsumerState<BlogCommentScreen> {
     super.dispose();
   }
 
+  String getFullPhotoUrl(String? url) {
+    if (url == null || url.isEmpty || url == 'null') {
+      return 'http://10.0.2.2:8000/storage/uploads/resources/default.png';
+    }
+
+    String processedUrl = url;
+
+    if (processedUrl.startsWith('http')) {
+      processedUrl =
+          processedUrl.replaceFirst('/storage/storage/', '/storage/');
+      processedUrl = processedUrl.replaceFirst('127.0.0.1', '10.0.2.2');
+      return processedUrl;
+    }
+
+    if (processedUrl.startsWith('storage/')) {
+      return 'http://10.0.2.2:8000/' + processedUrl;
+    }
+
+    return 'http://10.0.2.2:8000/storage/uploads/resources/' + processedUrl;
+  }
+
   @override
   Widget build(BuildContext context) {
     final comments = ref.watch(
@@ -173,29 +194,32 @@ class _BlogCommentScreenState extends ConsumerState<BlogCommentScreen> {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 CircleAvatar(
+                  radius: 20,
                   backgroundImage: NetworkImage(
-                    comment.user.photo ??
-                        'https://ui-avatars.com/api/?name=${comment.user.full_name}',
+                    getFullPhotoUrl(comment.user.photo!),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         comment.user.full_name,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       Text(
-                        comment.createdAt,
+                        _getTimeAgo(DateTime.parse(comment.createdAt)),
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -231,9 +255,19 @@ class _BlogCommentScreenState extends ConsumerState<BlogCommentScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(comment.content),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                comment.content,
+                style: const TextStyle(fontSize: 15),
+              ),
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 TextButton.icon(
@@ -245,13 +279,21 @@ class _BlogCommentScreenState extends ConsumerState<BlogCommentScreen> {
                   },
                   icon: const Icon(Icons.reply, size: 16),
                   label: const Text('Trả lời'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.deepPurple,
+                  ),
                 ),
-                if (comment.replies.isNotEmpty)
+                if (comment.replies.isNotEmpty) ...[
+                  const SizedBox(width: 16),
                   TextButton.icon(
                     onPressed: () {},
                     icon: const Icon(Icons.comment, size: 16),
                     label: Text('${comment.replies.length} trả lời'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.deepPurple,
+                    ),
                   ),
+                ],
               ],
             ),
             if (comment.replies.isNotEmpty)
@@ -267,5 +309,19 @@ class _BlogCommentScreenState extends ConsumerState<BlogCommentScreen> {
         ),
       ),
     );
+  }
+
+  String _getTimeAgo(DateTime dateTime) {
+    final difference = DateTime.now().difference(dateTime);
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays} ngày trước';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} giờ trước';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} phút trước';
+    } else {
+      return 'Vừa xong';
+    }
   }
 }

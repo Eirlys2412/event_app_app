@@ -176,16 +176,7 @@ class _MyRegisteredEventsScreenState
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => EventDetailScreen(event: {
-                    'id': event.id,
-                    'title': event.title,
-                    'summary': event.summary,
-                    'description': event.description,
-                    'timestart': event.timestart,
-                    'timeend': event.timeend,
-                    'diadiem': event.diadiem,
-                    'resources': event.resources,
-                  }),
+                  builder: (_) => EventDetailScreen(eventId: event.id),
                 ),
               );
             },

@@ -29,7 +29,7 @@ const String api_chuyenNganh = "$base/chuyenNganh";
 
 //event
 const String api_event = "$base/events"; //list sk
-String api_event_detail(int eventId) => "$base/events/$eventId"; //chi tiet ska2
+String api_event_detail(int eventId) => "$base/event/$eventId"; //chi tiet sk
 String api_listuser(int eventId) =>
     "$base/event/$eventId/participants"; //list user
 const String api_event_register = "$base/event_registrations"; //đk sk
@@ -49,10 +49,11 @@ const String api_action_delete = "$base/actions/{actionId}"; //xóa action
 
 // 🔥 Like
 const String api_like_toggle = "$base/likes/toggle"; // POST toggle like
-
+String api_rating_event(int eventId) =>
+    "$base/event/$eventId/rate"; // đánh giá sự kiện
 // 🔥 Vote
-const String api_vote = "$base/votes"; // POST vote
-const String api_vote_average = "$base/votes/average"; // /{type}/{id}
+const String api_vote = "$base/like"; // POST vote
+const String api_vote_average = "$base/vote"; // /{type}/{id}
 //tag
 const String api_tag = "$base/tags"; //list tag
 String api_tag_detail(int tagId) => "$base/tags/$tagId"; //chi tiet tag
@@ -98,6 +99,8 @@ String api_dsblog(int userId) =>
 
 String api_upload_image(int eventId) =>
     base + "/events/$eventId/images"; // POST upload image
+String api_delete_image(int eventId, int resourceId) =>
+    base + "/events/$eventId/images/$resourceId"; // DELETE xóa image
 
 var api_getaction = base + "/getaction";
 var api_like = base + "/like";

@@ -226,106 +226,106 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const ThemeSelector(),
         ],
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16),
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Sự kiện gần đây',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: CarouselSlider.builder(
+              itemCount: filteredEvents.isNotEmpty ? filteredEvents.length : 1,
+              options: CarouselOptions(
+                height: 280,
+                viewportFraction: 0.8,
+                enlargeCenterPage: true,
+                onPageChanged: (index, reason) {
+                  setState(() {
+                    _currentEventIndex = index;
+                  });
+                },
+                autoPlay: true,
+                autoPlayInterval: const Duration(seconds: 3),
+                autoPlayAnimationDuration: const Duration(milliseconds: 800),
+                autoPlayCurve: Curves.fastOutSlowIn,
+              ),
+              itemBuilder: (context, index, realIndex) {
+                if (filteredEvents.isEmpty) {
+                  return Center(
                     child: Text(
-                      'Sự kiện gần đây',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                      'Không có sự kiện nào',
+                      style: TextStyle(color: Colors.grey),
                     ),
+                  );
+                }
+                return _buildEventCard(
+                    filteredEvents[index], Theme.of(context));
+              },
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: const SizedBox(height: 8),
+          ),
+          SliverToBoxAdapter(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: filteredEvents.asMap().entries.map((entry) {
+                return Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Theme.of(context).primaryColor.withOpacity(
+                          _currentEventIndex == entry.key ? 0.9 : 0.4,
+                        ),
                   ),
-                  CarouselSlider.builder(
-                    itemCount:
-                        filteredEvents.isNotEmpty ? filteredEvents.length : 1,
-                    options: CarouselOptions(
-                      height: 280,
-                      viewportFraction: 0.8,
-                      enlargeCenterPage: true,
-                      onPageChanged: (index, reason) {
-                        setState(() {
-                          _currentEventIndex = index;
-                        });
-                      },
-                      autoPlay: true,
-                      autoPlayInterval: const Duration(seconds: 3),
-                      autoPlayAnimationDuration:
-                          const Duration(milliseconds: 800),
-                      autoPlayCurve: Curves.fastOutSlowIn,
-                    ),
-                    itemBuilder: (context, index, realIndex) {
-                      if (filteredEvents.isEmpty) {
-                        return Center(
-                          child: Text(
-                            'Không có sự kiện nào',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        );
-                      }
-                      return _buildEventCard(
-                          filteredEvents[index], Theme.of(context));
+                );
+              }).toList(),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Bài viết sự kiện nổi bật',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      // TODO: Navigate to all blogs
                     },
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: filteredEvents.asMap().entries.map((entry) {
-                      return Container(
-                        width: 8,
-                        height: 8,
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Theme.of(context).primaryColor.withOpacity(
-                                _currentEventIndex == entry.key ? 0.9 : 0.4,
-                              ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Bài viết sự kiện nổi bật',
-                          style:
-                              Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            // TODO: Navigate to all blogs
-                          },
-                          child: Text(
-                            'Xem tất cả',
-                            style: TextStyle(
-                                color: Theme.of(context).primaryColor),
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      'Xem tất cả',
+                      style: TextStyle(color: Theme.of(context).primaryColor),
                     ),
-                  ),
-                  ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: blogs.length,
-                    itemBuilder: (context, index) {
-                      return _buildBlogCard(blogs[index], Theme.of(context));
-                    },
                   ),
                 ],
               ),
             ),
+          ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                return _buildBlogCard(blogs[index], Theme.of(context));
+              },
+              childCount: blogs.length,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -351,7 +351,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => EventDetailScreen(event: event)),
+            MaterialPageRoute(
+                builder: (_) => EventDetailScreen(eventId: event['id'])),
           );
         },
         child: Column(
@@ -363,7 +364,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const BorderRadius.vertical(top: Radius.circular(16)),
               child: MediaViewer(
                 resources: event['resources_data'] as List?,
-                height: 140,
+                height: 149,
                 width: double.infinity,
                 borderRadius: 16,
                 fit: BoxFit.cover,
@@ -388,21 +389,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(
-                        Icons.location_on_outlined,
-                        size: 16,
-                        color: Colors.blue,
-                      ),
+                      Icon(Icons.access_time, size: 16, color: Colors.orange),
                       const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          event['location'] ?? 'Không rõ địa điểm',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      Text(
+                        _getEventTime(event),
+                        style: const TextStyle(
+                            fontSize: 13, color: Colors.black87),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.info, size: 16, color: Colors.green),
+                      const SizedBox(width: 4),
+                      Text(
+                        _getEventStatus(event),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _getEventStatusColor(event),
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
@@ -538,5 +544,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
     );
+  }
+
+  String _getEventTime(Map<String, dynamic> event) {
+    final start = event['timestart'];
+    final end = event['timeend'];
+    if (start != null && end != null) {
+      return '${_formatDate(start)} - ${_formatDate(end)}';
+    }
+    return 'Chưa cập nhật';
+  }
+
+  String _getEventStatus(Map<String, dynamic> event) {
+    final now = DateTime.now();
+    final start = event['timestart'] != null
+        ? DateTime.tryParse(event['timestart'])
+        : null;
+    final end =
+        event['timeend'] != null ? DateTime.tryParse(event['timeend']) : null;
+    if (start == null || end == null) return 'Không xác định';
+    if (now.isBefore(start)) return 'Sắp diễn ra';
+    if (now.isAfter(end)) return 'Đã kết thúc';
+    return 'Đang diễn ra';
+  }
+
+  Color _getEventStatusColor(Map<String, dynamic> event) {
+    final status = _getEventStatus(event);
+    switch (status) {
+      case 'Sắp diễn ra':
+        return Colors.orange;
+      case 'Đang diễn ra':
+        return Colors.green;
+      case 'Đã kết thúc':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return '';
+    final date = DateTime.tryParse(dateStr);
+    if (date == null) return '';
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 }

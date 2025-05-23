@@ -78,155 +78,6 @@ class BlogDetailScreen extends ConsumerWidget {
         backgroundColor: const Color.fromARGB(255, 154, 144, 243),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black87),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert,
-                color: Color.fromARGB(255, 0, 0, 0)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            position: PopupMenuPosition.under,
-            elevation: 3,
-            onSelected: (value) {
-              switch (value) {
-                case 'profile':
-                  break;
-                case 'edit':
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => EditPostScreen(
-                        id: blog.id.toString(),
-                        blog: blog,
-                      ),
-                    ),
-                  );
-                  break;
-                case 'delete':
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      title: Text(
-                        'Xác nhận xóa',
-                        style: TextStyle(
-                            color:
-                                Theme.of(context).textTheme.bodyLarge?.color),
-                      ),
-                      content: Text(
-                        'Bạn có chắc chắn muốn xóa bài viết này?',
-                        style: TextStyle(
-                            color:
-                                Theme.of(context).textTheme.bodyMedium?.color),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: Text(
-                            'Hủy',
-                            style: TextStyle(color: themeState.primaryColor),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            ref
-                                .read(blogRepositoryProvider)
-                                .deletePost(blog.id);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Đã xóa bài viết.',
-                                  style: TextStyle(
-                                      color: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.color),
-                                ),
-                                backgroundColor:
-                                    Theme.of(context).scaffoldBackgroundColor,
-                              ),
-                            );
-                          },
-                          child: Text(
-                            'Xóa',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                  break;
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'profile',
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.person_outline,
-                        color: Theme.of(context).textTheme.bodyLarge?.color,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Xem trang cá nhân',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              PopupMenuItem(
-                value: 'edit',
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.edit_outlined,
-                        color: Theme.of(context).textTheme.bodyLarge?.color,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Chỉnh sửa bài viết',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.delete_outline,
-                        color: Colors.red,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Xóa bài viết',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.red,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -286,22 +137,47 @@ class BlogDetailScreen extends ConsumerWidget {
                 if (blog.photo != null &&
                     blog.photo?.isNotEmpty == true &&
                     blog.photo != 'null')
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                    child: Image.network(
-                      getFullPhotoUrl(blog.photo),
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        height: 200,
-                        color: Colors.grey[100],
-                        child: const Icon(
-                          Icons.broken_image_outlined,
-                          color: Colors.grey,
-                          size: 40,
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => Dialog(
+                          backgroundColor: Colors.black,
+                          child: InteractiveViewer(
+                            child: Image.network(
+                              getFullPhotoUrl(blog.photo),
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: Colors.grey[100],
+                                child: const Icon(
+                                  Icons.broken_image_outlined,
+                                  color: Colors.grey,
+                                  size: 40,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
+                      child: Image.network(
+                        getFullPhotoUrl(blog.photo),
+                        height: 220,
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 220,
+                          color: Colors.grey[100],
+                          child: const Icon(
+                            Icons.broken_image_outlined,
+                            color: Colors.grey,
+                            size: 40,
+                          ),
                         ),
                       ),
                     ),
@@ -343,19 +219,24 @@ class BlogDetailScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildInteractionButton(
-                icon: Icons.thumb_up_outlined,
+                icon: Icons.favorite_border,
                 label: 'Thích (${blog.countLike})',
                 onTap: () {},
               ),
               _buildInteractionButton(
                 icon: Icons.comment_outlined,
                 label: 'Bình luận (${blog.countComment})',
-                onTap: () {},
-              ),
-              _buildInteractionButton(
-                icon: Icons.share_outlined,
-                label: 'Chia sẻ',
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BlogCommentScreen(
+                        blogId: blog.id,
+                        blogTitle: blog.title,
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),

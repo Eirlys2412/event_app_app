@@ -22,11 +22,12 @@ class CommentRepository {
       {required int itemId, required String itemCode}) async {
     final headers = await _getAuthHeaders();
     final response = await http.get(
-      Uri.parse('$api_getComment?item_id=$itemId&item_code=$itemCode'),
+      Uri.parse('$api_getComment?item_id=$itemId&item_type=$itemCode'),
       headers: headers,
     );
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
+      print('Fetched data from API: $data');
       final List commentsJson = data['data'] ?? [];
       return commentsJson.map((e) => Comment.fromJson(e)).toList();
     } else {

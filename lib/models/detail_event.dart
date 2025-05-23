@@ -3,6 +3,8 @@ import 'package:event_app/models/event.dart';
 class Detailevent extends Event {
   final int? ticket_Price;
   final int? available_ticket;
+  final double averageRating;
+  final int totalVotes;
 
   Detailevent({
     required int id,
@@ -17,6 +19,8 @@ class Detailevent extends Event {
     required DateTime updatedAt,
     this.ticket_Price,
     this.available_ticket,
+    required this.averageRating,
+    required this.totalVotes,
   }) : super(
           id: id,
           title: title,
@@ -55,6 +59,8 @@ class Detailevent extends Event {
           json['updated_at'] ?? DateTime.now().toIso8601String()),
       ticket_Price: json['ticket_price'],
       available_ticket: json['available_ticket'],
+      averageRating: (json['average_rating'] ?? 0.0).toDouble(),
+      totalVotes: (json['total_votes'] ?? 0),
     );
   }
 
