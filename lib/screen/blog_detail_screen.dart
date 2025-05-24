@@ -14,6 +14,7 @@ import '../screen/editposstScreen.dart';
 import '../widgets/user_profile.dart';
 import '../providers/comment_provider.dart';
 import '../models/comment.dart';
+import '../providers/blog_detail_provider.dart' hide blogRepositoryProvider;
 
 String getFullPhotoUrl(String? url) {
   if (url == null || url.isEmpty || url == 'null') {
@@ -218,11 +219,46 @@ class BlogDetailScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildInteractionButton(
-                icon: Icons.favorite_border,
-                label: 'Thích (${blog.countLike})',
-                onTap: () {},
-              ),
+              Consumer(builder: (context, ref, child) {
+                final blogRepository = ref.read(blogRepositoryProvider);
+
+                return _buildInteractionButton(
+                  icon: blog.is_liked ? Icons.favorite : Icons.favorite_border,
+                  label: 'Thích (${blog.likes_count})',
+                  iconColor: blog.is_liked ? Colors.red : Colors.grey[700],
+                  onTap: () async {
+                    try {
+                      final response =
+                          await blogRepository.toggleLikeBlog(blog.id);
+                      if (response.statusCode >= 200 &&
+                          response.statusCode < 300) {
+                        ref.invalidate(blogDetailProvider);
+
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Thao tác like thành công!')),
+                          );
+                        }
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text(
+                                    'Lỗi khi thích bài viết: ${response.statusCode}')),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Lỗi: ${e.toString()}')),
+                        );
+                      }
+                    }
+                  },
+                );
+              }),
               _buildInteractionButton(
                 icon: Icons.comment_outlined,
                 label: 'Bình luận (${blog.countComment})',
@@ -237,6 +273,7 @@ class BlogDetailScreen extends ConsumerWidget {
                     ),
                   );
                 },
+                iconColor: Colors.grey[700],
               ),
             ],
           ),
@@ -275,6 +312,7 @@ class BlogDetailScreen extends ConsumerWidget {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    Color? iconColor,
   }) {
     return InkWell(
       onTap: onTap,
@@ -282,7 +320,7 @@ class BlogDetailScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: Colors.grey[700]),
+            Icon(icon, size: 20, color: iconColor ?? Colors.grey[700]),
             const SizedBox(width: 4),
             Text(
               label,

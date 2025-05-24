@@ -19,40 +19,36 @@ class EventCard extends StatelessWidget {
     required this.themeState,
   }) : super(key: key);
 
-  String getEventStatus(String? timestart, String? timeend) {
-    if (timestart == null || timeend == null) return 'Không xác định';
-    final now = DateTime.now();
-    final start = DateTime.tryParse(timestart);
-    final end = DateTime.tryParse(timeend);
-    if (start == null || end == null) return 'Không xác định';
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'upcoming':
+        return 'Sắp diễn ra';
+      case 'ongoing':
+        return 'Đang diễn ra';
+      case 'ended':
+        return 'Đã kết thúc';
+      default:
+        return 'Không xác định';
+    }
+  }
 
-    if (now.isBefore(start)) {
-      return 'Sắp diễn ra';
-    } else if (now.isAfter(end)) {
-      return 'Đã diễn ra';
-    } else {
-      return 'Đang diễn ra';
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'ended':
+        return Colors.red;
+      case 'ongoing':
+        return Colors.green;
+      case 'upcoming':
+        return Colors.orange;
+      default:
+        return themeState.secondaryTextColor;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final status = getEventStatus(
-        event.startTime.toIso8601String(), event.endTime.toIso8601String());
-    Color statusColor;
-    switch (status) {
-      case 'Đã diễn ra':
-        statusColor = Colors.red;
-        break;
-      case 'Đang diễn ra':
-        statusColor = Colors.green;
-        break;
-      case 'Sắp diễn ra':
-        statusColor = Colors.orange;
-        break;
-      default:
-        statusColor = themeState.secondaryTextColor;
-    }
+    final statusText = _getStatusText(event.status);
+    final statusColor = _getStatusColor(event.status);
 
     return GestureDetector(
       onTap: () {
@@ -110,7 +106,7 @@ class EventCard extends StatelessWidget {
                         const Icon(Icons.info_outline, size: 16),
                         const SizedBox(width: 4),
                         Text(
-                          status,
+                          statusText,
                           style: TextStyle(
                             color: statusColor,
                             fontWeight: FontWeight.bold,

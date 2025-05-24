@@ -31,6 +31,8 @@ class BlogDetail extends BlogApproved {
     required this.hasComment,
     required this.comments,
     required this.voteRecord,
+    required bool is_liked,
+    required int likes_count,
   }) : super(
           id: id,
           title: title,
@@ -49,6 +51,8 @@ class BlogDetail extends BlogApproved {
           countLike: countLike,
           countComment: countComment,
           tags: tags,
+          is_liked: is_liked,
+          likes_count: likes_count,
         );
 
   factory BlogDetail.fromJson(Map<String, dynamic> json) {
@@ -94,6 +98,8 @@ class BlogDetail extends BlogApproved {
       hasComment: tuongtac['hasComment'] ?? 0,
       comments: tuongtac['comments'] ?? [],
       voteRecord: tuongtac['voteRecord'],
+      is_liked: tuongtac['is_liked'] ?? false,
+      likes_count: tuongtac['likes_count'] ?? 0,
     );
   }
 }

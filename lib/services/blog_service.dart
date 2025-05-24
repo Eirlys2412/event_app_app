@@ -38,6 +38,8 @@ class BlogService {
         tags: ['Flutter', 'Mobile', 'Development', 'Tutorial']
             .sublist(0, (index % 4) + 1),
         slug: 'blog-post-${index + 1}',
+        is_liked: index % 2 == 0,
+        likes_count: index * 5 + 1,
       ),
     );
   }
@@ -72,6 +74,8 @@ class BlogService {
       tags: ['Flutter', 'Mobile', 'Development', 'Tutorial']
           .sublist(0, (index % 4) + 1),
       slug: 'blog-post-$index',
+      is_liked: index % 2 == 0,
+      likes_count: index * 5 + 1,
     );
   }
 }

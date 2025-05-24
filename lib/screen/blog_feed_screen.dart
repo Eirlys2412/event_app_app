@@ -257,9 +257,66 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
                               Row(
                                 children: [
                                   _buildInteractionButton(
-                                    icon: Icons.favorite_border,
-                                    label: blog.countLike.toString(),
+                                    icon: blog.is_liked
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    label: blog.likes_count.toString(),
                                     themeState: themeState,
+                                    iconColor: blog.is_liked
+                                        ? Colors.red
+                                        : themeState.secondaryTextColor,
+                                    onPressed: () async {
+                                      try {
+                                        final response = await ref
+                                            .read(blogRepositoryProvider)
+                                            .toggleLikeBlog(blog.id);
+                                        if (response.statusCode >= 200 &&
+                                            response.statusCode < 300) {
+                                          final responseData =
+                                              json.decode(response.body);
+                                          setState(() {
+                                            final index = _blogs.indexWhere(
+                                                (b) => b.id == blog.id);
+                                            if (index != -1) {
+                                              final currentBlog = _blogs[index];
+                                              final updatedBlogData = {
+                                                ...currentBlog.toJson(),
+                                                'is_liked':
+                                                    responseData['is_liked'] ??
+                                                        false,
+                                                'likes_count': responseData[
+                                                        'likes_count'] ??
+                                                    0,
+                                              };
+                                              _blogs[index] =
+                                                  BlogApproved.fromJson(
+                                                      updatedBlogData);
+                                            }
+                                          });
+                                        } else {
+                                          print(
+                                              'Like Blog API Error: ${response.statusCode}');
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                  content: Text(
+                                                      'Lỗi khi thích bài viết: ${response.statusCode}')),
+                                            );
+                                          }
+                                        }
+                                      } catch (e) {
+                                        print('Error toggling blog like: $e');
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                                content: Text(
+                                                    'Lỗi: ${e.toString()}')),
+                                          );
+                                        }
+                                      }
+                                    },
                                   ),
                                   const SizedBox(width: 16),
                                   IconButton(
@@ -276,7 +333,6 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
                                     },
                                     icon: Icon(Icons.comment_outlined),
                                   ),
-                                
                                 ],
                               ),
                             ],
@@ -355,13 +411,14 @@ Widget _buildInteractionButton({
   required String label,
   required ThemeState themeState,
   VoidCallback? onPressed,
+  Color? iconColor,
 }) {
   return InkWell(
     onTap: onPressed,
     borderRadius: BorderRadius.circular(8),
     child: Row(
       children: [
-        Icon(icon, size: 18, color: themeState.secondaryTextColor),
+        Icon(icon, size: 18, color: iconColor ?? themeState.secondaryTextColor),
         const SizedBox(width: 4),
         Text(
           label,

@@ -1,3 +1,5 @@
+import 'package:event_app/models/like.dart';
+
 import 'user.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -13,13 +15,13 @@ class Comment {
   final String createdAt;
   final String updatedAt;
   final User user;
+  final List<Like> likes;
   final List<Comment> replies;
+
   bool is_liked;
   int likes_count;
 
   // Getter để lấy URL ảnh đầy đủ
-
-// Getter để lấy URL ảnh đầy đủ
   String? get commentResourcesUrl {
     if (commentResources == null || commentResources!.isEmpty) {
       return null;
@@ -38,8 +40,7 @@ class Comment {
       baseUrl = 'http://192.168.94.41:8000';
     } else {
       // Thiết bị thật hoặc chế độ release - sử dụng URL production
-      baseUrl =
-          'http://192.168.94.41:8000'; // Thay thế bằng URL thực tế của bạn
+      baseUrl = 'http://192.168.94.41:8000'; // Thay thế bằng URL thực tế của bạn
     }
 
     return '$baseUrl/storage/$commentResources';
@@ -56,6 +57,7 @@ class Comment {
     required this.createdAt,
     required this.updatedAt,
     required this.user,
+    required this.likes,
     required this.replies,
     this.is_liked = false,
     this.likes_count = 0,
@@ -63,24 +65,19 @@ class Comment {
 
   factory Comment.fromJson(Map<String, dynamic> json) {
     return Comment(
-      id: json['id'] is String ? int.parse(json['id']) : json['id'] ?? 0,
-      itemId: json['item_id'] is String
-          ? int.parse(json['item_id'])
-          : json['item_id'] ?? 0,
+      id: json['id'] ?? 0,
+      itemId: json['item_id'] ?? 0,
       itemCode: json['item_code'] ?? '',
-      userId: json['user_id'] is String
-          ? int.parse(json['user_id'])
-          : json['user_id'] ?? 0,
+      userId: json['user_id'] ?? 0,
       content: json['content'] ?? '',
-      parentId: json['parent_id'] != null
-          ? (json['parent_id'] is String
-              ? int.parse(json['parent_id'])
-              : json['parent_id'])
-          : null,
+      parentId: json['parent_id'],
       commentResources: json['comment_resources'],
       createdAt: json['created_at'] ?? '',
       updatedAt: json['updated_at'] ?? '',
       user: User.fromJson(json['user'] ?? {}),
+      likes: (json['likes'] as List<dynamic>? ?? [])
+          .map((likeJson) => Like.fromJson(likeJson))
+          .toList(),
       replies: (json['replies'] as List<dynamic>? ?? [])
           .map((replyJson) => Comment.fromJson(replyJson))
           .toList(),

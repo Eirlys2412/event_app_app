@@ -21,17 +21,28 @@ class CommentRepository {
   Future<List<Comment>> fetchComments(
       {required int itemId, required String itemCode}) async {
     final headers = await _getAuthHeaders();
+    print("$api_getComment?item_type=$itemCode&item_id=$itemId");
     final response = await http.get(
-      Uri.parse('$api_getComment?item_id=$itemId&item_type=$itemCode'),
+      Uri.parse('$api_getComment?item_type=$itemCode&item_id=$itemId'),
       headers: headers,
     );
     if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      print('Fetched data from API: $data');
-      final List commentsJson = data['data'] ?? [];
-      return commentsJson.map((e) => Comment.fromJson(e)).toList();
+      // Check if the response body is a List directly
+      final dynamic decodedBody = json.decode(response.body);
+      if (decodedBody is List) {
+        final List<dynamic> commentsJson = decodedBody;
+        return commentsJson.map((e) => Comment.fromJson(e)).toList();
+      } else if (decodedBody is Map<String, dynamic> &&
+          decodedBody['success'] == true &&
+          decodedBody['data'] is List) {
+        // Handle the case where it's a Map with 'data' key (existing logic)
+        final List<dynamic> commentsJson = decodedBody['data'];
+        return commentsJson.map((e) => Comment.fromJson(e)).toList();
+      } else {
+        throw Exception('Unexpected API response format');
+      }
     } else {
-      throw Exception('Lỗi khi lấy bình luận');
+      throw Exception('Lỗi khi lấy bình luận: ${response.statusCode}');
     }
   }
 

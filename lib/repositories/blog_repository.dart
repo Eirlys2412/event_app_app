@@ -250,7 +250,8 @@ class BlogRepository {
     );
 
     if (response.statusCode != 200) {
-      throw Exception("Cập nhật thất bại: ${response.body}");
+      throw Exception(
+          "Lỗi cập nhật bài viết: ${response.statusCode} ${response.body}");
     }
   }
 
@@ -294,5 +295,17 @@ class BlogRepository {
     } else {
       throw Exception('Lỗi khi lấy bài viết của người dùng');
     }
+  }
+
+  // Thêm phương thức toggleLikeBlog
+  Future<http.Response> toggleLikeBlog(int blogId) async {
+    final url = Uri.parse(api_like_blog(blogId));
+    final headers = await _getAuthHeaders();
+
+    final response = await http.post(
+      url,
+      headers: headers,
+    );
+    return response;
   }
 }

@@ -18,6 +18,8 @@ class BlogApproved {
   final int countLike;
   final int countComment;
   final List<String> tags;
+  final bool is_liked;
+  final int likes_count;
 
   BlogApproved({
     required this.id,
@@ -37,6 +39,8 @@ class BlogApproved {
     required this.countLike,
     required this.countComment,
     required this.tags,
+    required this.is_liked,
+    required this.likes_count,
   });
 
   factory BlogApproved.fromJson(Map<String, dynamic> json) {
@@ -78,6 +82,8 @@ class BlogApproved {
       countLike: json['hit'] ?? 0,
       countComment: json['count_comment'] ?? 0,
       tags: tagsList,
+      is_liked: json['is_liked'] ?? false,
+      likes_count: json['likes_count'] ?? 0,
     );
   }
 
@@ -100,6 +106,8 @@ class BlogApproved {
       'count_like': countLike,
       'count_comment': countComment,
       'tags': tags,
+      'is_liked': is_liked,
+      'likes_count': likes_count,
     };
   }
 }

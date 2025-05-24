@@ -1,7 +1,9 @@
+import 'package:event_app/screen/blog_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/comment.dart';
 import '../providers/comment_provider.dart';
+import '../providers/like_provider.dart';
 
 class BlogCommentScreen extends ConsumerStatefulWidget {
   final int blogId;
@@ -20,52 +22,46 @@ class _BlogCommentScreenState extends ConsumerState<BlogCommentScreen> {
   Comment? _replyingTo;
   Comment? _editingComment;
 
+  String _formatDateTime(String dateTimeStr) {
+    try {
+      final dateTime = DateTime.parse(dateTimeStr);
+      return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return dateTimeStr;
+    }
+  }
+
+  // Thêm provider key
+  late final _providerKey = {'itemId': widget.blogId, 'itemCode': 'blog'};
+
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    Future.microtask(() {
-      ref
-          .read(
-              commentListProvider({'itemId': widget.blogId, 'itemCode': 'blog'})
-                  .notifier)
-          .loadComments();
+  void initState() {
+    super.initState();
+    // Load comments khi component mount
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return; // Kiểm tra mounted trước khi sử dụng ref
+      final notifier =
+          ref.read(blogCommentListProvider(widget.blogId).notifier);
+      notifier.loadComments();
+      notifier.startAutoRefresh();
+      notifier.loadComments();
+      notifier.startAutoRefresh();
     });
   }
 
   @override
   void dispose() {
+    // if (mounted) {
+    //   ref.read(commentListProvider(_providerKey).notifier).cancelAutoRefresh();
+    // }
     _commentController.dispose();
     super.dispose();
   }
 
-  String getFullPhotoUrl(String? url) {
-    if (url == null || url.isEmpty || url == 'null') {
-      return 'http://10.0.2.2:8000/storage/uploads/resources/default.png';
-    }
-
-    String processedUrl = url;
-
-    if (processedUrl.startsWith('http')) {
-      processedUrl =
-          processedUrl.replaceFirst('/storage/storage/', '/storage/');
-      processedUrl = processedUrl.replaceFirst('127.0.0.1', '10.0.2.2');
-      return processedUrl;
-    }
-
-    if (processedUrl.startsWith('storage/')) {
-      return 'http://10.0.2.2:8000/' + processedUrl;
-    }
-
-    return 'http://10.0.2.2:8000/storage/uploads/resources/' + processedUrl;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final comments = ref.watch(
-        commentListProvider({'itemId': widget.blogId, 'itemCode': 'blog'}));
-    final notifier = ref.read(
-        commentListProvider({'itemId': widget.blogId, 'itemCode': 'blog'})
-            .notifier);
+    final commentState = ref.watch(blogCommentListProvider(widget.blogId));
+    final notifier = ref.read(blogCommentListProvider(widget.blogId).notifier);
 
     return Scaffold(
       appBar: AppBar(
@@ -75,15 +71,18 @@ class _BlogCommentScreenState extends ConsumerState<BlogCommentScreen> {
       body: Column(
         children: [
           Expanded(
-            child: comments.isEmpty
-                ? const Center(child: Text('Chưa có bình luận nào'))
-                : ListView.builder(
-                    padding: const EdgeInsets.all(8),
-                    itemCount: comments.length,
-                    itemBuilder: (context, index) {
-                      return _buildCommentItem(comments[index], notifier);
-                    },
-                  ),
+            child: commentState.error != null
+                ? Center(child: Text('Lỗi: ${commentState.error}'))
+                : commentState.comments.isEmpty
+                    ? const Center(child: Text('Chưa có bình luận nào'))
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(8),
+                        itemCount: commentState.comments.length,
+                        itemBuilder: (context, index) {
+                          return _buildCommentItem(
+                              commentState.comments[index], notifier);
+                        },
+                      ),
           ),
           Container(
             padding: const EdgeInsets.all(8),
@@ -160,7 +159,10 @@ class _BlogCommentScreenState extends ConsumerState<BlogCommentScreen> {
                       onPressed: () async {
                         if (_commentController.text.trim().isEmpty) return;
                         if (_editingComment != null) {
-                          // Nếu muốn hỗ trợ update comment, thêm hàm update vào provider
+                          await notifier.updateComment(
+                            id: _editingComment!.id,
+                            content: _commentController.text.trim(),
+                          );
                         } else {
                           await notifier.addComment(
                             content: _commentController.text.trim(),
@@ -194,32 +196,28 @@ class _BlogCommentScreenState extends ConsumerState<BlogCommentScreen> {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(8.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 CircleAvatar(
-                  radius: 20,
                   backgroundImage: NetworkImage(
-                    getFullPhotoUrl(comment.user.photo!),
+                   getAvatarUrl(avatar)',
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         comment.user.full_name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        _getTimeAgo(DateTime.parse(comment.createdAt)),
+                        _formatDateTime(comment.createdAt),
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -255,21 +253,35 @@ class _BlogCommentScreenState extends ConsumerState<BlogCommentScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                comment.content,
-                style: const TextStyle(fontSize: 15),
-              ),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+            Text(comment.content),
+            const SizedBox(height: 8),
             Row(
               children: [
+                TextButton.icon(
+                  onPressed: () {
+                    ref
+                        .read(likeStateProvider(
+                            {'type': 'comment', 'id': comment.id}).notifier)
+                        .toggle();
+                  },
+                  icon: Icon(
+                    comment.is_liked ? Icons.thumb_up : Icons.thumb_up_outlined,
+                    size: 16,
+                    color: comment.is_liked
+                        ? const Color.fromARGB(255, 93, 0, 255)
+                        : Colors.grey[600],
+                  ),
+                  label: Text(
+                    'Like (${comment.likes_count})',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: comment.is_liked
+                          ? Colors.deepPurple
+                          : Colors.grey[600],
+                    ),
+                  ),
+                ),
                 TextButton.icon(
                   onPressed: () {
                     setState(() {
@@ -279,21 +291,13 @@ class _BlogCommentScreenState extends ConsumerState<BlogCommentScreen> {
                   },
                   icon: const Icon(Icons.reply, size: 16),
                   label: const Text('Trả lời'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.deepPurple,
-                  ),
                 ),
-                if (comment.replies.isNotEmpty) ...[
-                  const SizedBox(width: 16),
+                if (comment.replies.isNotEmpty)
                   TextButton.icon(
                     onPressed: () {},
                     icon: const Icon(Icons.comment, size: 16),
                     label: Text('${comment.replies.length} trả lời'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.deepPurple,
-                    ),
                   ),
-                ],
               ],
             ),
             if (comment.replies.isNotEmpty)
@@ -309,19 +313,5 @@ class _BlogCommentScreenState extends ConsumerState<BlogCommentScreen> {
         ),
       ),
     );
-  }
-
-  String _getTimeAgo(DateTime dateTime) {
-    final difference = DateTime.now().difference(dateTime);
-
-    if (difference.inDays > 0) {
-      return '${difference.inDays} ngày trước';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} giờ trước';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} phút trước';
-    } else {
-      return 'Vừa xong';
-    }
   }
 }

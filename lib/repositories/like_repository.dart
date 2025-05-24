@@ -36,4 +36,32 @@ class LikeRepository {
       throw Exception('Lỗi toggle like: ${response.statusCode}');
     }
   }
+
+  Future<bool> toggleCommentLike(int commentId) async {
+    final token = await PrefData.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Token không tồn tại. Vui lòng đăng nhập lại.');
+    }
+
+    // Determine host for different platforms
+    final host = kIsWeb
+        ? 'localhost:8000'
+        : (Platform.isAndroid ? '10.0.2.2:8000' : '127.0.0.1:8000');
+    final url = Uri.http(host, '/api/v1/comments/$commentId/toggle-like');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['is_liked'] ?? false;
+    } else {
+      throw Exception('Lỗi toggle like comment: ${response.statusCode}');
+    }
+  }
 }

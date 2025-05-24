@@ -39,6 +39,11 @@ var api_join =
     "$base/event_registrations/my-registrations"; // ds sự kiện chờ duyệt
 String api_userevent(userId) => "$base/event-users/user/userId";
 
+//tym
+String api_like_image(int resourceId) =>
+    "$base/event-images/$resourceId/toggle-like";
+
+String api_like_blog(int blogId) => "$base/blogs/$blogId/toggle-like";
 //action
 const String api_action = "$base/actions"; //list action
 String api_action_detail(int actionId) =>
