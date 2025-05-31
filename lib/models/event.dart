@@ -10,6 +10,7 @@ class Event {
   final String? summary;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String status;
 
   Event({
     required this.id,
@@ -23,7 +24,20 @@ class Event {
     this.summary,
     required this.createdAt,
     required this.updatedAt,
+    required this.status,
   });
+
+  // Phương thức để xác định trạng thái sự kiện
+  static String determineStatus(DateTime startTime, DateTime endTime) {
+    final now = DateTime.now();
+    if (now.isBefore(startTime)) {
+      return 'upcoming'; // Sắp diễn ra
+    } else if (now.isAfter(endTime)) {
+      return 'ended'; // Đã kết thúc
+    } else {
+      return 'ongoing'; // Đang diễn ra
+    }
+  }
 
   // json to model
   factory Event.fromJson(Map<String, dynamic> json) {
@@ -35,15 +49,19 @@ class Event {
     if (photoUrl.contains('localhost')) {
       photoUrl = photoUrl.replaceFirst('localhost', '10.0.2.2');
     }
+
+    final startTime = DateTime.tryParse(json['start_time'] as String? ?? '') ??
+        DateTime.now();
+    final endTime = DateTime.tryParse(json['end_time'] as String? ?? '') ??
+        DateTime.now().add(const Duration(hours: 1));
+
     return Event(
       id: json['id'] as int? ?? 0,
       title: json['title'] as String? ?? 'Không có tiêu đề',
       description: json['description'] as String? ?? 'Không có mô tả',
       location: json['location'] as String? ?? 'Chưa rõ địa điểm',
-      startTime: DateTime.tryParse(json['start_time'] as String? ?? '') ??
-          DateTime.now(),
-      endTime: DateTime.tryParse(json['end_time'] as String? ?? '') ??
-          DateTime.now().add(const Duration(hours: 1)),
+      startTime: startTime,
+      endTime: endTime,
       photo: photoUrl.isNotEmpty ? photoUrl : null,
       resourcesData:
           (json['resources_data'] as List?)?.cast<Map<String, dynamic>>(),
@@ -52,6 +70,7 @@ class Event {
           DateTime.now(),
       updatedAt: DateTime.tryParse(json['updated_at'] as String? ?? '') ??
           DateTime.now(),
+      status: determineStatus(startTime, endTime),
     );
   }
 
@@ -69,6 +88,7 @@ class Event {
       'summary': summary,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'status': status,
     };
   }
 }
@@ -86,7 +106,8 @@ class Detailevent {
   final double? averageRating;
   final int? totalVotes;
   final List<dynamic>? resources;
-  final List<dynamic>? resourcesData;
+  final List<Map<String, dynamic>>?
+      resourcesData; // Đảm bảo kiểu là Map<String, dynamic>
   final int? userRating;
   final Map<String, int>? ratingDistribution;
 
@@ -116,6 +137,35 @@ class Detailevent {
       ratingDist = Map<String, int>.from(ratingInfo['rating_distribution']);
     }
 
+    // Parse resources_data và thêm trường is_liked, total_likes
+    List<dynamic>? resourcesDataJson = json['resources_data'];
+    List<Map<String, dynamic>>? resourcesData;
+    if (resourcesDataJson is List) {
+      resourcesData = resourcesDataJson
+          .map((item) {
+            if (item is Map<String, dynamic>) {
+              // Đọc các trường từ JSON (API trả về is_liked và total_likes)
+              final bool isLiked = item['is_liked'] ?? false;
+              final int totalLikes = item['total_likes'] is int
+                  ? item['total_likes']
+                  : int.tryParse(item['total_likes'].toString()) ?? 0;
+
+              // Tạo Map mới để đảm bảo key nhất quán
+              final Map<String, dynamic> parsedItem = Map.from(item);
+              parsedItem['is_liked'] = isLiked;
+              parsedItem['total_likes'] = totalLikes;
+
+              return parsedItem;
+            } else {
+              print(
+                  'Warning: Item in resources_data is not Map<String, dynamic>: $item');
+              return <String, dynamic>{}; // Trả về map rỗng với kiểu đúng
+            }
+          })
+          .where((item) => item.isNotEmpty)
+          .toList();
+    }
+
     return Detailevent(
       id: json['id'] ?? 0,
       title: json['title'] ?? '',
@@ -131,9 +181,7 @@ class Detailevent {
       resources: json['resources'] is List
           ? (json['resources'] as List).cast<dynamic>()
           : null,
-      resourcesData: json['resources_data'] is List
-          ? (json['resources_data'] as List).cast<dynamic>()
-          : null,
+      resourcesData: resourcesData,
       userRating: json['user_rating'],
       ratingDistribution: ratingDist,
     );

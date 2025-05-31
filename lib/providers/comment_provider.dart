@@ -2,158 +2,192 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/comment_repository.dart';
 import '../models/comment.dart';
+import 'dart:async';
 
-final commentRepositoryProvider = Provider<CommentRepository>((ref) {
-  return CommentRepository();
-});
+// State class để quản lý trạng thái comments
+class CommentsState {
+  final List<Comment> comments;
+  final bool isLoading;
+  final String? error;
 
-class CommentListNotifier extends StateNotifier<List<Comment>> {
+  CommentsState({
+    required this.comments,
+    this.isLoading = false,
+    this.error,
+  });
+
+  CommentsState copyWith({
+    List<Comment>? comments,
+    bool? isLoading,
+    String? error,
+  }) {
+    return CommentsState(
+      comments: comments ?? this.comments,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+    );
+  }
+}
+
+// Base Notifier class cho comments
+class CommentListNotifier extends StateNotifier<CommentsState> {
   final CommentRepository repo;
   final int itemId;
-  final String itemCode;
+  final String itemType; // 'blog' hoặc 'event'
+  Timer? _refreshTimer;
+  bool _isDisposed = false;
 
-  CommentListNotifier(this.repo, this.itemId, this.itemCode) : super([]) {
-    loadComments();
+  CommentListNotifier({
+    required this.repo,
+    required this.itemId,
+    required this.itemType,
+  }) : super(CommentsState(comments: [])) {
+    print('Khởi tạo CommentListNotifier cho $itemType với id $itemId');
+  }
+
+  @override
+  void dispose() {
+    print('CommentListNotifier đang được dispose cho $itemType với id $itemId');
+    _isDisposed = true;
+    _cleanupResources();
+    super.dispose();
+  }
+
+  void _cleanupResources() {
+    print('Đang dọn dẹp tài nguyên cho $itemType với id $itemId');
+    stopAutoRefresh();
+  }
+
+  void startAutoRefresh() {
+    if (_isDisposed) {
+      print('Không thể start refresh vì notifier đã bị dispose');
+      return;
+    }
+
+    stopAutoRefresh(); // Đảm bảo không có timer cũ
+
+    print('Bắt đầu auto refresh cho $itemType với id $itemId');
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (!_isDisposed) {
+        print('Đang refresh comments cho $itemType với id $itemId');
+        loadComments();
+      } else {
+        print('Bỏ qua refresh vì notifier đã bị dispose');
+        stopAutoRefresh();
+      }
+    });
+  }
+
+  void stopAutoRefresh() {
+    if (_refreshTimer != null) {
+      print('Dừng auto refresh cho $itemType với id $itemId');
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+    }
   }
 
   Future<void> loadComments() async {
+    if (_isDisposed) return;
+
     try {
-      final comments =
-          await repo.fetchComments(itemId: itemId, itemCode: itemCode);
-      print(
-          'Fetched ${comments.length} comments for itemId: $itemId, itemCode: $itemCode');
-      state = comments;
+      state = state.copyWith(isLoading: true, error: null);
+      final comments = await repo.fetchComments(
+        itemId: itemId,
+        itemCode: itemType,
+      );
+      if (!_isDisposed) {
+        state = state.copyWith(
+          comments: comments,
+          isLoading: false,
+          error: null,
+        );
+      }
     } catch (e) {
-      // Xử lý lỗi nếu cần
+      if (!_isDisposed) {
+        state = state.copyWith(
+          isLoading: false,
+          error: e.toString(),
+        );
+      }
     }
   }
 
   Future<void> addComment({required String content, int? parentId}) async {
-    await repo.createComment({
-      'item_id': itemId,
-      'item_code': itemCode,
-      'content': content,
-      if (parentId != null) 'parent_id': parentId,
-    });
-    await loadComments();
-  }
+    if (_isDisposed) return;
 
-  Future<void> deleteComment(int id) async {
-    await repo.deleteComment(id);
-    await loadComments();
+    try {
+      await repo.createComment({
+        'item_id': itemId,
+        'item_code': itemType,
+        'content': content,
+        if (parentId != null) 'parent_id': parentId,
+      });
+      await loadComments();
+    } catch (e) {
+      if (!_isDisposed) {
+        state = state.copyWith(error: e.toString());
+      }
+    }
   }
 
   Future<void> updateComment({required int id, required String content}) async {
-    await repo.updateComment(id: id, content: content);
-    await loadComments();
-  }
-}
-
-// Provider family để truyền tham số động (ví dụ: id sự kiện, loại sự kiện)
-final commentListProvider = StateNotifierProvider.family<CommentListNotifier,
-    List<Comment>, Map<String, dynamic>>(
-  (ref, params) {
-    final repo = ref.watch(commentRepositoryProvider);
-    return CommentListNotifier(repo, params['itemId'], params['itemCode']);
-  },
-);
-
-class CommentProvider with ChangeNotifier {
-  final CommentRepository commentRepository;
-  List<Comment> _comments = [];
-  bool _isLoading = false;
-  String _errorMessage = '';
-
-  CommentProvider({required this.commentRepository});
-
-  List<Comment> get comments => _comments;
-  bool get isLoading => _isLoading;
-  String get errorMessage => _errorMessage;
-
-  Future<void> fetchComments({
-    required int itemId,
-    required String itemCode,
-  }) async {
-    _isLoading = true;
-    _errorMessage = '';
-    notifyListeners();
+    if (_isDisposed) return;
 
     try {
-      _comments = await commentRepository.fetchComments(
-        itemId: itemId,
-        itemCode: itemCode,
-      );
+      await repo.updateComment(id: id, content: content);
+      await loadComments();
     } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> createComment({
-    required int itemId,
-    required String itemCode,
-    required String content,
-    int? parentId,
-    String? commentResources,
-  }) async {
-    _isLoading = true;
-    _errorMessage = '';
-    notifyListeners();
-
-    try {
-      await commentRepository.createComment({
-        'item_id': itemId,
-        'item_code': itemCode,
-        'content': content,
-      });
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Future<void> updateComment({
-    required int id,
-    required String content,
-  }) async {
-    _isLoading = true;
-    _errorMessage = '';
-    notifyListeners();
-
-    try {
-      final updatedComment = await commentRepository.updateComment(
-        id: id,
-        content: content,
-      );
-      final index = _comments.indexWhere((c) => c.id == id);
-      if (index != -1) {
-        _comments[index] = updatedComment;
+      if (!_isDisposed) {
+        state = state.copyWith(error: e.toString());
       }
-    } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
     }
   }
 
   Future<void> deleteComment(int id) async {
-    _isLoading = true;
-    _errorMessage = '';
-    notifyListeners();
+    if (_isDisposed) return;
 
     try {
-      await commentRepository.deleteComment(id);
-      _comments.removeWhere((c) => c.id == id);
+      await repo.deleteComment(id);
+      await loadComments();
     } catch (e) {
-      _errorMessage = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+      if (!_isDisposed) {
+        state = state.copyWith(error: e.toString());
+      }
     }
   }
 }
+
+// Provider riêng cho Blog Comments
+final blogCommentListProvider = StateNotifierProvider.autoDispose
+    .family<CommentListNotifier, CommentsState, int>((ref, blogId) {
+  final repo = ref.read(commentRepositoryProvider);
+
+  // Tự động cleanup khi provider bị dispose
+  ref.onDispose(() {
+    print('Blog Comment Provider đã được dispose cho blogId: $blogId');
+  });
+
+  return CommentListNotifier(
+    repo: repo,
+    itemId: blogId,
+    itemType: 'blog',
+  );
+});
+
+// Provider riêng cho Event Comments
+final eventCommentListProvider = StateNotifierProvider.autoDispose
+    .family<CommentListNotifier, CommentsState, int>((ref, eventId) {
+  final repo = ref.read(commentRepositoryProvider);
+
+  ref.onDispose(() {
+    print('Event Comment Provider đã được dispose cho eventId: $eventId');
+  });
+
+  return CommentListNotifier(
+    repo: repo,
+    itemId: eventId,
+    itemType: 'event',
+  );
+});
+// Provider cho comment repository
+final commentRepositoryProvider = Provider((ref) => CommentRepository());

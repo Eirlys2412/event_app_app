@@ -14,6 +14,8 @@ import '../screen/editposstScreen.dart';
 import '../widgets/user_profile.dart';
 import '../providers/comment_provider.dart';
 import '../models/comment.dart';
+import '../providers/blog_detail_provider.dart' hide blogRepositoryProvider;
+import 'dart:convert';
 
 String getFullPhotoUrl(String? url) {
   if (url == null || url.isEmpty || url == 'null') {
@@ -218,11 +220,61 @@ class BlogDetailScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildInteractionButton(
-                icon: Icons.favorite_border,
-                label: 'Thích (${blog.countLike})',
-                onTap: () {},
-              ),
+              Consumer(builder: (context, ref, child) {
+                final blogRepository = ref.read(blogRepositoryProvider);
+
+                return _buildInteractionButton(
+                  icon: blog.is_liked ? Icons.favorite : Icons.favorite_border,
+                  label: 'Thích (${blog.countLike})',
+                  iconColor: blog.is_liked ? Colors.red : Colors.grey[700],
+                  onTap: () async {
+                    try {
+                      final response =
+                          await blogRepository.toggleLikeBlog(blog.id);
+                      if (response.statusCode >= 200 &&
+                          response.statusCode < 300) {
+                        final responseData = json.decode(response.body);
+                        // Cập nhật trạng thái like trong provider
+                        final bool isNowLiked =
+                            responseData['is_liked'] ?? false;
+                        final int currentLikesCount =
+                            responseData['likes_count'] ?? 0;
+                        print(
+                            'API response for like/unlike: is_liked=$isNowLiked, likes_count=$currentLikesCount'); // Debug print
+                        ref.read(blogDetailProvider.notifier).updateLikeStatus(
+                              blog.id,
+                              isNowLiked,
+                              currentLikesCount,
+                            );
+
+                        if (context.mounted) {
+                          // Hiển thị thông báo cụ thể hơn
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text(isNowLiked
+                                    ? 'Đã thích bài viết!'
+                                    : 'Đã bỏ thích bài viết!')),
+                          );
+                        }
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text(
+                                    'Lỗi khi thích bài viết: ${response.statusCode}')),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Lỗi: ${e.toString()}')),
+                        );
+                      }
+                    }
+                  },
+                );
+              }),
               _buildInteractionButton(
                 icon: Icons.comment_outlined,
                 label: 'Bình luận (${blog.countComment})',
@@ -237,6 +289,7 @@ class BlogDetailScreen extends ConsumerWidget {
                     ),
                   );
                 },
+                iconColor: Colors.grey[700],
               ),
             ],
           ),
@@ -275,6 +328,7 @@ class BlogDetailScreen extends ConsumerWidget {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    Color? iconColor,
   }) {
     return InkWell(
       onTap: onTap,
@@ -282,7 +336,7 @@ class BlogDetailScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: Colors.grey[700]),
+            Icon(icon, size: 20, color: iconColor ?? Colors.grey[700]),
             const SizedBox(width: 4),
             Text(
               label,

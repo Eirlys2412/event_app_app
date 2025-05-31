@@ -13,7 +13,8 @@ class DetailEventRepository {
   Future<Detailevent> fetchDetailEvent(int id) async {
     final token = await PrefData.getToken(); // Lấy token
     final url = api_event_detail(id); // Lấy URL đầy đủ
-    print('Fetching detail from URL: $url'); // In URL ra log
+    print(
+        'Fetching detail for event ID: $id from URL: $url'); // In ID và URL ra log
     final response = await http.get(
       Uri.parse(url), // Sử dụng biến url
       headers: {'Authorization': 'Bearer $token'}, // Thêm header xác thực

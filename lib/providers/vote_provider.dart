@@ -1,3 +1,4 @@
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/vote_repository.dart';
 import 'dart:convert';
@@ -7,8 +8,15 @@ import './detail_event_provider.dart'; // Import detailEventProvider
 class VoteStats {
   final double averageRating;
   final int totalVotes;
+  final int userRating;
+  final bool isVoted;
 
-  VoteStats({required this.averageRating, required this.totalVotes});
+  VoteStats({
+    required this.averageRating,
+    required this.totalVotes,
+    required this.userRating,
+    required this.isVoted,
+  });
 }
 
 final voteRepositoryProvider = Provider((ref) => VoteRepository());
@@ -42,8 +50,12 @@ class VoteNotifier extends StateNotifier<VoteStats> {
       double initialRating,
       int initialVotes,
       this.refreshDetailEvent) // Nhận hàm callback qua constructor
-      : super(
-            VoteStats(averageRating: initialRating, totalVotes: initialVotes));
+      : super(VoteStats(
+          averageRating: initialRating,
+          totalVotes: initialVotes,
+          userRating: 0,
+          isVoted: false,
+        ));
 
   Future<void> vote(int score) async {
     try {
@@ -59,6 +71,8 @@ class VoteNotifier extends StateNotifier<VoteStats> {
         state = VoteStats(
           averageRating: (data['data']['average_rating'] ?? 0.0).toDouble(),
           totalVotes: (data['data']['total_votes'] ?? 0),
+          userRating: (data['data'][RatingBar] ?? score).toInt(),
+          isVoted: true,
         );
         print(
             'VoteState updated to: Average Rating = ${state.averageRating}, Total Votes = ${state.totalVotes}'); // Log state mới

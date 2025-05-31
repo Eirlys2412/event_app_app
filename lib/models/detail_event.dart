@@ -32,6 +32,7 @@ class Detailevent extends Event {
           resourcesData: resourcesData,
           createdAt: createdAt,
           updatedAt: updatedAt,
+          status: Event.determineStatus(startTime, endTime),
         );
 
   factory Detailevent.fromjson(Map<String, dynamic> json) {
