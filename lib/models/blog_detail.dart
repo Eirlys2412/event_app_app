@@ -25,6 +25,7 @@ class BlogDetail extends BlogApproved {
     required int countBookmarked,
     required int countLike,
     required int countComment,
+  
     required List<String> tags,
     required this.isBookmarked,
     required this.reactions,
@@ -50,6 +51,7 @@ class BlogDetail extends BlogApproved {
           countBookmarked: countBookmarked,
           countLike: countLike,
           countComment: countComment,
+  
           tags: tags,
           is_liked: is_liked,
           likes_count: likes_count,
@@ -92,6 +94,7 @@ class BlogDetail extends BlogApproved {
       countBookmarked: tuongtac['countBookmarked'] ?? 0,
       countLike: tuongtac['countLike'] ?? 0,
       countComment: tuongtac['countComment'] ?? 0,
+  
       tags: tagsList,
       isBookmarked: tuongtac['isBookmarked'] ?? false,
       reactions: tuongtac['reactions'] ?? [],

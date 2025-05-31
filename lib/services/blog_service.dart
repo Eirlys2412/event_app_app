@@ -40,6 +40,7 @@ class BlogService {
         slug: 'blog-post-${index + 1}',
         is_liked: index % 2 == 0,
         likes_count: index * 5 + 1,
+    
       ),
     );
   }
@@ -71,6 +72,7 @@ class BlogService {
       countBookmarked: index * 3,
       countLike: index * 10,
       countComment: index * 5,
+
       tags: ['Flutter', 'Mobile', 'Development', 'Tutorial']
           .sublist(0, (index % 4) + 1),
       slug: 'blog-post-$index',

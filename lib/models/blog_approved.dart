@@ -17,6 +17,7 @@ class BlogApproved {
   final int countBookmarked;
   final int countLike;
   final int countComment;
+
   final List<String> tags;
   final bool is_liked;
   final int likes_count;
@@ -59,28 +60,32 @@ class BlogApproved {
     }
 
     //xử lý ảnh
-    String photo = json['photo'] ?? '';
-    if (photo.startsWith('http://127.0.0.1:8000/')) {
-      photo =
-          photo.replaceFirst('http://127.0.0.1:8000/', 'http://10.0.2.2:8000/');
+    String? photo = json['photo'] as String?;
+    if (photo?.startsWith('http://127.0.0.1:8000/') == true) {
+      photo = photo?.replaceFirst(
+          'http://127.0.0.1:8000/', 'http://10.0.2.2:8000/');
     }
+
+    // Debug print for toggleLike
+    print('Blog ID: ${json['id']}, toggleLike from API: ${json['toggleLike']}');
+
     return BlogApproved(
-      id: json['id'],
-      title: json['title'] ?? '',
-      slug: json['slug'] ?? '',
-      summary: json['summary'] ?? '',
+      id: (json['id'] as int?) ?? 0,
+      title: (json['title'] as String?) ?? '',
+      slug: (json['slug'] as String?) ?? '',
+      summary: (json['summary'] as String?) ?? '',
       content: json['content'] ?? '',
       catId: json['cat_id'] ?? 0,
-      photo: json['photo'] ?? '',
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      photo: photo ?? '',
+      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(json['updated_at'] ?? '') ?? DateTime.now(),
       userId: json['user_id']?.toString() ?? '',
       authorName: json['author_name'] ?? '',
       authorPhoto: json['author_photo'] ?? '',
       authorId: json['author_id']?.toString() ?? '',
-      countBookmarked: json['count_bookmarked'] ?? 0,
-      countLike: json['hit'] ?? 0,
-      countComment: json['count_comment'] ?? 0,
+      countBookmarked: json['countBookmarked'] ?? 0,
+      countLike: json['countLike'] ?? 0,
+      countComment: json['countComment'] ?? 0,
       tags: tagsList,
       is_liked: json['is_liked'] ?? false,
       likes_count: json['likes_count'] ?? 0,

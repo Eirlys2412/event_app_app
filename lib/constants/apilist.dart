@@ -131,3 +131,5 @@ Profile initialProfile = const Profile(
     role: '',
     email: '',
     id: 0);
+
+var api_statistics_top = base + "/statistics/top";

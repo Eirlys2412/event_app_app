@@ -37,6 +37,38 @@ class BlogDetailNotifier extends StateNotifier<BlogDetailState> {
       state = state.copyWith(blog: null, isLoading: false);
     }
   }
+
+  void updateLikeStatus(int blogId, bool isLiked, int likesCount) {
+    if (state.blog != null && state.blog!.id == blogId) {
+      final updatedBlog = BlogDetail(
+        id: state.blog!.id,
+        title: state.blog!.title,
+        slug: state.blog!.slug,
+        summary: state.blog!.summary,
+        content: state.blog!.content,
+        catId: state.blog!.catId,
+        photo: state.blog!.photo,
+        createdAt: state.blog!.createdAt,
+        updatedAt: state.blog!.updatedAt,
+        userId: state.blog!.userId,
+        authorName: state.blog!.authorName,
+        authorPhoto: state.blog!.authorPhoto,
+        authorId: state.blog!.authorId,
+        countBookmarked: state.blog!.countBookmarked,
+        countLike: likesCount,
+        countComment: state.blog!.countComment,
+        tags: state.blog!.tags,
+        isBookmarked: state.blog!.isBookmarked,
+        reactions: state.blog!.reactions,
+        hasComment: state.blog!.hasComment,
+        comments: state.blog!.comments,
+        voteRecord: state.blog!.voteRecord,
+        is_liked: isLiked,
+        likes_count: likesCount,
+      );
+      state = state.copyWith(blog: updatedBlog);
+    }
+  }
 }
 
 final blogRepositoryProvider = Provider<BlogRepository>((ref) {

@@ -15,10 +15,9 @@ import '../providers/theme_provider.dart';
 import '../widgets/user_profile.dart';
 import '../screen/blog_comment_screen.dart';
 import '../constants/apilist.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:async';
 import '../providers/user_provider.dart';
+import '../utils/url_utils.dart' as url_utils;
 
 class BlogFeedScreen extends ConsumerStatefulWidget {
   const BlogFeedScreen({super.key});
@@ -27,59 +26,9 @@ class BlogFeedScreen extends ConsumerStatefulWidget {
   ConsumerState<BlogFeedScreen> createState() => _BlogFeedScreenState();
 }
 
-String getAvatarUrl(String? avatar) {
-  if (avatar != null && avatar.isNotEmpty && avatar != 'null') {
-    // Use getFullPhotoUrl to handle both full URLs and relative storage paths
-    return getFullPhotoUrl(avatar);
-  }
-  // Return a default avatar URL if the provided avatar is null, empty, or 'null'
-  return 'http://10.0.2.2:8000/storage/uploads/resources/default.png'; // Default avatar path
-}
-
 class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
-  bool _isLoading = false;
-  String _error = '';
-  List<BlogApproved> _blogs = [];
-  Timer? _timer;
-
-  Future<void> _loadBlogs() async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _error = '';
-      });
-
-      final response = await http.get(Uri.parse(api_getblog));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true && data['blogs'] != null) {
-          final blogsData = data['blogs']['data'] as List;
-          setState(() {
-            _blogs =
-                blogsData.map((json) => BlogApproved.fromJson(json)).toList();
-            _isLoading = false;
-          });
-        } else {
-          setState(() {
-            _error = 'Không có dữ liệu bài viết';
-            _isLoading = false;
-          });
-        }
-      } else {
-        setState(() {
-          _error = 'Lỗi kết nối server';
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _error = 'Có lỗi xảy ra: $e';
-        _isLoading = false;
-      });
-    }
-  }
 
   List<BlogApproved> _filterBlogs(List<BlogApproved> blogs, String keyword) {
     if (keyword.isEmpty) return blogs;
@@ -94,6 +43,8 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
     final blogs = ref.watch(blogListProvider);
     final themeState = ref.watch(themeProvider);
     final theme = Theme.of(context);
+
+    final filteredBlogs = _filterBlogs(blogs, _searchController.text);
 
     return Scaffold(
       drawer: const DrawerCustom(),
@@ -132,14 +83,17 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
           const ThemeSelector(),
         ],
       ),
-      body: blogs.isEmpty
-          ? Center(child: Text('Chưa có bài viết nào'))
+      body: filteredBlogs.isEmpty
+          ? Center(
+              child: _isSearching
+                  ? const Text('Không tìm thấy bài viết nào')
+                  : const Text('Chưa có bài viết nào'))
           : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: blogs.length,
+              itemCount: filteredBlogs.length,
               itemBuilder: (context, index) {
-                if (index >= blogs.length) return null;
-                final blog = blogs[index];
+                if (index >= filteredBlogs.length) return null;
+                final blog = filteredBlogs[index];
                 if (blog == null) return null;
 
                 return InkWell(
@@ -164,7 +118,7 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
                             child: AspectRatio(
                               aspectRatio: 16 / 9,
                               child: Image.network(
-                                getFullPhotoUrl(blog.photo),
+                                url_utils.getFullPhotoUrl(blog.photo),
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
                                   return Container(
@@ -187,7 +141,7 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
                                     radius: 16,
                                     backgroundColor: themeState.surfaceColor,
                                     backgroundImage: NetworkImage(
-                                      getAvatarUrl(blog.authorPhoto),
+                                      url_utils.getAvatarUrl(blog.authorPhoto),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -260,7 +214,7 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
                                     icon: blog.is_liked
                                         ? Icons.favorite
                                         : Icons.favorite_border,
-                                    label: blog.likes_count.toString(),
+                                    label: 'Thích (${blog.countLike})',
                                     themeState: themeState,
                                     iconColor: blog.is_liked
                                         ? Colors.red
@@ -274,39 +228,31 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
                                             response.statusCode < 300) {
                                           final responseData =
                                               json.decode(response.body);
-                                          setState(() {
-                                            final index = _blogs.indexWhere(
-                                                (b) => b.id == blog.id);
-                                            if (index != -1) {
-                                              final currentBlog = _blogs[index];
-                                              final updatedBlogData = {
-                                                ...currentBlog.toJson(),
-                                                'is_liked':
-                                                    responseData['is_liked'] ??
-                                                        false,
-                                                'likes_count': responseData[
-                                                        'likes_count'] ??
+                                          ref
+                                              .read(blogListProvider.notifier)
+                                              .updateLikeStatus(
+                                                blog.id,
+                                                responseData['is_liked'] ??
+                                                    false,
+                                                responseData['likes_count'] ??
                                                     0,
-                                              };
-                                              _blogs[index] =
-                                                  BlogApproved.fromJson(
-                                                      updatedBlogData);
-                                            }
-                                          });
-                                        } else {
-                                          print(
-                                              'Like Blog API Error: ${response.statusCode}');
+                                              );
                                           if (mounted) {
                                             ScaffoldMessenger.of(context)
                                                 .showSnackBar(
                                               SnackBar(
-                                                  content: Text(
-                                                      'Lỗi khi thích bài viết: ${response.statusCode}')),
+                                                content: Text(responseData[
+                                                        'is_liked']
+                                                    ? 'Đã thích bài viết'
+                                                    : 'Đã bỏ thích bài viết'),
+                                              ),
                                             );
                                           }
+                                        } else {
+                                          throw Exception(
+                                              'API error: ${response.statusCode}');
                                         }
                                       } catch (e) {
-                                        print('Error toggling blog like: $e');
                                         if (mounted) {
                                           ScaffoldMessenger.of(context)
                                               .showSnackBar(
@@ -319,7 +265,10 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
                                     },
                                   ),
                                   const SizedBox(width: 16),
-                                  IconButton(
+                                  _buildInteractionButton(
+                                    icon: Icons.comment_outlined,
+                                    label: 'Bình luận',
+                                    themeState: themeState,
                                     onPressed: () {
                                       Navigator.push(
                                         context,
@@ -331,7 +280,6 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
                                         ),
                                       );
                                     },
-                                    icon: Icon(Icons.comment_outlined),
                                   ),
                                 ],
                               ),
@@ -357,53 +305,11 @@ class _BlogFeedScreenState extends ConsumerState<BlogFeedScreen> {
       ),
     );
   }
-
-  void startAutoReload() {
-    _timer = Timer.periodic(Duration(seconds: 30), (_) => _loadBlogs());
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
 }
 
 String formatDateTime(DateTime? date) {
   if (date == null) return 'Không có ngày';
   return DateFormat('dd/MM/yyyy HH:mm').format(date);
-}
-
-String getFullPhotoUrl(String? url) {
-  // If url is null or empty, return default avatar URL
-  if (url == null || url.isEmpty || url == 'null') {
-    return 'http://10.0.2.2:8000/storage/uploads/resources/default.png'; // Default avatar path
-  }
-
-  String processedUrl = url;
-
-  // If url is already a full URL
-  if (processedUrl.startsWith('http')) {
-    // Fix repeated storage segment if present (e.g., http://.../storage/storage/...)
-    processedUrl = processedUrl.replaceFirst('/storage/storage/', '/storage/');
-
-    // Handle emulator address
-    processedUrl = processedUrl.replaceFirst('127.0.0.1', '10.0.2.2');
-
-    return processedUrl;
-  }
-
-  // Handle relative paths
-  // Assume paths starting with 'storage/' are relative to the base URL's storage directory
-  if (processedUrl.startsWith('storage/')) {
-    // Correctly prepend base URL for storage paths
-    // Use 10.0.2.2 for emulator
-    return 'http://10.0.2.2:8000/' + processedUrl; // Correctly prepend base URL
-  }
-
-  // For other relative paths or just filenames, assume they are resources
-  return 'http://10.0.2.2:8000/storage/uploads/resources/' +
-      processedUrl; // Old logic for resource paths
 }
 
 Widget _buildInteractionButton({
@@ -435,10 +341,8 @@ Widget _buildInteractionButton({
 Widget _buildMoreButton(BlogApproved blog, ThemeState themeState) {
   return Consumer(
     builder: (context, ref, child) {
-      // Lấy userId hiện tại từ userProvider
       final currentUserId = ref.watch(userProvider)?.id.toString() ?? '';
 
-      // Chỉ hiện nút 3 chấm nếu là bài viết của user hiện tại
       if (currentUserId != blog.userId) {
         return const SizedBox.shrink();
       }

@@ -10,6 +10,7 @@ import '../screen/qr_screen.dart';
 import '../constants/apilist.dart';
 import '../screen/my_blog_screen.dart';
 import '../screen/my_event_screen.dart';
+import '../screen/statistics_screen.dart';
 
 const String _baseUrl = 'http://10.0.2.2:8000/';
 
@@ -132,13 +133,13 @@ class DrawerCustom extends ConsumerWidget {
             title: 'Bài viết của tôi',
             destination: const MyBlogScreen(),
           ),
-          // _buildMenuItem(
-          //   context,
-          //   ref,
-          //   icon: Icons.notifications,
-          //   title: 'Lịch sử thanh toán',
-          //   destination: PaymentHistoryScreen(),
-          // ),
+          _buildMenuItem(
+            context,
+            ref,
+            icon: Icons.area_chart,
+            title: 'Thống kê',
+            destination: const StatisticsScreen(),
+          ),
           _buildMenuItem(
             context,
             ref,

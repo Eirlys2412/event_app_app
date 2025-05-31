@@ -189,6 +189,5 @@ final eventCommentListProvider = StateNotifierProvider.autoDispose
     itemType: 'event',
   );
 });
-
 // Provider cho comment repository
 final commentRepositoryProvider = Provider((ref) => CommentRepository());

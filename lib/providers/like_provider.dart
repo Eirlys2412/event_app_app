@@ -10,6 +10,12 @@ final likeStateProvider =
       ref.read(likeRepositoryProvider), params['type'], params['id']);
 });
 
+final commentLikeStateProvider =
+    StateNotifierProviderFamily<CommentLikeNotifier, bool, int>(
+        (ref, commentId) {
+  return CommentLikeNotifier(ref.read(likeRepositoryProvider), commentId);
+});
+
 class LikeNotifier extends StateNotifier<bool> {
   final LikeRepository repository;
   final String type;
@@ -24,6 +30,24 @@ class LikeNotifier extends StateNotifier<bool> {
     } catch (e, stack) {
       // Log any errors when toggling like
       print('Error toggling like: $e');
+      print(stack);
+      rethrow;
+    }
+  }
+}
+
+class CommentLikeNotifier extends StateNotifier<bool> {
+  final LikeRepository repository;
+  final int commentId;
+
+  CommentLikeNotifier(this.repository, this.commentId) : super(false);
+
+  Future<void> toggle() async {
+    try {
+      final liked = await repository.toggleCommentLike(commentId);
+      state = liked;
+    } catch (e, stack) {
+      print('Error toggling comment like: $e');
       print(stack);
       rethrow;
     }

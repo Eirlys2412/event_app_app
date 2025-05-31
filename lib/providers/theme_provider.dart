@@ -120,6 +120,14 @@ class ThemeState {
   Color get errorColor => themeMode == ThemeMode.dark
       ? const Color(0xFFCF6679)
       : const Color(0xFFB00020);
+
+  // Card and Dialog colors
+  Color get cardColor =>
+      themeMode == ThemeMode.dark ? const Color(0xFF1E1E1E) : Colors.white;
+  Color get dialogBackgroundColor =>
+      cardColor; // Use card color for dialog background
+  Color get dialogTextColor =>
+      themeMode == ThemeMode.dark ? Colors.white : Colors.black;
 }
 
 final themeProvider = StateNotifierProvider<ThemeNotifier, ThemeState>((ref) {

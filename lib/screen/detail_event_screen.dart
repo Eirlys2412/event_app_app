@@ -22,6 +22,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../utils/url_utils.dart';
 import '../providers/detail_event_provider.dart';
+import '../providers/profile_provider.dart';
 
 class EventDetailScreen extends ConsumerStatefulWidget {
   final int eventId;
@@ -41,6 +42,15 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
     try {
       final dateTime = DateTime.parse(dateTimeStr);
       return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return dateTimeStr;
+    }
+  }
+
+  String _formatDate(String dateTimeStr) {
+    try {
+      final dateTime = DateTime.parse(dateTimeStr);
+      return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
     } catch (e) {
       return dateTimeStr;
     }
@@ -129,36 +139,45 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              Consumer(builder: (context, ref, _) {
-                final double initialRating = eventData.averageRating ?? 0.0;
-                final int initialVotes = eventData.totalVotes ?? 0;
-                final int eventId = eventData.id;
-
+              Consumer(builder: (context, ref, child) {
+                final eventData =
+                    ref.watch(detailEventProvider(widget.eventId)).value;
                 final voteStats = ref.watch(voteStateProvider({
                   'type': 'event',
-                  'id': eventId,
-                  'initialRating': initialRating,
-                  'initialVotes': initialVotes,
+                  'id': eventData?.id ?? widget.eventId,
+                  'initialRating': eventData?.averageRating ?? 0.0,
+                  'initialVotes': eventData?.totalVotes ?? 0,
                 }));
+
+                print(
+                    'VoteStats: isVoted=${voteStats.isVoted}, userRating=${voteStats.userRating}');
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     RatingBar.builder(
-                      initialRating: voteStats.averageRating,
+                      initialRating: voteStats.isVoted
+                          ? voteStats.userRating.toDouble()
+                          : 0.0,
                       minRating: 1,
                       direction: Axis.horizontal,
                       allowHalfRating: false,
                       itemCount: 5,
                       itemSize: 30,
-                      itemPadding: const EdgeInsets.symmetric(horizontal: 2),
-                      itemBuilder: (context, _) =>
-                          Icon(Icons.star, color: Colors.amber),
+                      itemPadding: const EdgeInsets.symmetric(horizontal: 1),
+                      itemBuilder: (context, index) => Icon(
+                        Icons.star,
+                        color: voteStats.isVoted && index < voteStats.userRating
+                            ? Colors.grey[400]
+                            : Colors.amber,
+                      ),
                       onRatingUpdate: (rating) async {
                         try {
                           await ref
-                              .read(voteStateProvider(
-                                  {'type': 'event', 'id': eventId}).notifier)
+                              .read(voteStateProvider({
+                                'type': 'event',
+                                'id': eventData?.id ?? widget.eventId,
+                              }).notifier)
                               .vote(rating.toInt());
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -319,26 +338,15 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
 
   void _showRatingDialog(
       BuildContext context, WidgetRef ref, int eventId, ThemeState themeState) {
-    final currentVoteStats = ref.read(voteStateProvider({
+    final voteStats = ref.read(voteStateProvider({
       'type': 'event',
       'id': eventId,
-      'initialRating': ref
-          .read(voteStateProvider({
-            'type': 'event',
-            'id': eventId,
-            'initialRating': 0.0,
-            'initialVotes': 0
-          }))
-          .averageRating,
-      'initialVotes': ref
-          .read(voteStateProvider({
-            'type': 'event',
-            'id': eventId,
-            'initialRating': 0.0,
-            'initialVotes': 0
-          }))
-          .totalVotes,
+      'initialRating': 0.0,
+      'initialVotes': 0,
     }));
+
+    print(
+        'Dialog VoteStats: isVoted=${voteStats.isVoted}, userRating=${voteStats.userRating}');
 
     showDialog(
       context: context,
@@ -349,24 +357,28 @@ class _EventDetailScreenState extends ConsumerState<EventDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               RatingBar.builder(
-                initialRating: currentVoteStats.averageRating,
+                initialRating:
+                    voteStats.isVoted ? voteStats.userRating.toDouble() : 0.0,
                 minRating: 1,
                 direction: Axis.horizontal,
                 allowHalfRating: false,
                 itemCount: 5,
                 itemSize: 30,
-                itemPadding: const EdgeInsets.symmetric(horizontal: 2),
-                itemBuilder: (context, _) => Icon(
+                itemPadding: const EdgeInsets.symmetric(horizontal: 8),
+                itemBuilder: (context, index) => Icon(
                   Icons.star,
-                  color: Colors.amber,
+                  color: voteStats.isVoted && index < voteStats.userRating
+                      ? Colors.amber
+                      : Colors.grey[400],
                 ),
                 onRatingUpdate: (rating) async {
                   Navigator.pop(context);
                   try {
                     await ref
-                        .read(
-                            voteStateProvider({'type': 'event', 'id': eventId})
-                                .notifier)
+                        .read(voteStateProvider({
+                          'type': 'event',
+                          'id': eventId,
+                        }).notifier)
                         .vote(rating.toInt());
                     if (context.mounted) {
                       showDialog(
@@ -453,10 +465,10 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
   Comment? _replyingTo;
   Comment? _editingComment;
 
-  String _formatDateTime(String dateTimeStr) {
+  String _formatDate(String dateTimeStr) {
     try {
       final dateTime = DateTime.parse(dateTimeStr);
-      return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+      return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
     } catch (e) {
       return dateTimeStr;
     }
@@ -571,6 +583,38 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
   }
 
   Future<void> _deleteComment(Comment comment) async {
+    // Lấy ID người dùng hiện tại
+    final currentUserProfileState = ref.read(profileProvider);
+    final currentUserId = currentUserProfileState.profile?.id;
+
+    // Kiểm tra nếu bình luận không thuộc về người dùng hiện tại
+    if (currentUserId == null || comment.user.id != currentUserId) {
+      // Hiển thị popup thông báo
+      if (mounted) {
+        showDialog(
+          // Sử dụng showDialog để hiển thị popup
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Không thể xóa'),
+              content:
+                  const Text('Bạn không thể xóa bình luận của người khác.'),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('Đóng'),
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Đóng popup
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      }
+      return; // Ngừng thực hiện hàm xóa
+    }
+
+    // Tiếp tục xóa nếu bình luận là của người dùng hiện tại
     try {
       await ref
           .read(eventCommentListProvider(widget.eventId).notifier)
@@ -593,6 +637,11 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
   }
 
   Widget _buildCommentItem(Comment comment) {
+    // Lấy ID người dùng hiện tại
+    final currentUserProfileState = ref.watch(profileProvider);
+    final currentUserId = currentUserProfileState.profile?.id;
+    final isMyComment = comment.user.id == currentUserId;
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: Padding(
@@ -623,8 +672,7 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        _formatDateTime(
-                            comment.createdAt), // Áp dụng hàm format thời gian
+                        _formatDate(comment.createdAt),
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -636,12 +684,9 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
                 // Placeholder cho nút Like
                 TextButton.icon(
                   onPressed: () {
-                    if (comment.id != null) {
-                      ref
-                          .read(likeStateProvider(
-                              {'type': 'comment', 'id': comment.id}).notifier)
-                          .toggle();
-                    }
+                    ref
+                        .read(commentLikeStateProvider(comment.id).notifier)
+                        .toggle();
                   },
                   icon: Icon(
                     comment.is_liked ? Icons.thumb_up : Icons.thumb_up_outlined,
@@ -660,31 +705,33 @@ class _EventCommentsSectionState extends ConsumerState<EventCommentsSection> {
                     ),
                   ),
                 ),
-                PopupMenuButton<String>(
-                  onSelected: (value) {
-                    switch (value) {
-                      case 'edit':
-                        setState(() {
-                          _editingComment = comment;
-                          _commentController.text = comment.content;
-                        });
-                        break;
-                      case 'delete':
-                        _deleteComment(comment);
-                        break;
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Text('Chỉnh sửa'),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Text('Xóa'),
-                    ),
-                  ],
-                ),
+                // PopupMenuButton chỉ hiển thị nếu bình luận là của người dùng hiện tại
+                if (isMyComment)
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'edit':
+                          setState(() {
+                            _editingComment = comment;
+                            _commentController.text = comment.content;
+                          });
+                          break;
+                        case 'delete':
+                          _deleteComment(comment); // Gọi hàm xóa đã sửa đổi
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Chỉnh sửa'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Xóa'),
+                      ),
+                    ],
+                  ),
               ],
             ),
             const SizedBox(height: 8),
@@ -894,6 +941,15 @@ class _EventGalleryState extends ConsumerState<EventGallery> {
     try {
       final dateTime = DateTime.parse(dateTimeStr);
       return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return dateTimeStr;
+    }
+  }
+
+  String _formatDate(String dateTimeStr) {
+    try {
+      final dateTime = DateTime.parse(dateTimeStr);
+      return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}';
     } catch (e) {
       return dateTimeStr;
     }
@@ -1109,6 +1165,7 @@ class _EventGalleryState extends ConsumerState<EventGallery> {
                         child: GestureDetector(
                           onTap: () async {
                             final resourceId = image['id'];
+                            print('Liking image with ID: $resourceId');
                             if (resourceId == null) return;
 
                             try {

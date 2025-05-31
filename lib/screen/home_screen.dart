@@ -15,6 +15,7 @@ import '../constants/pref_data.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../widgets/media_viewer.dart';
 import '../utils/url_utils.dart';
+import '../providers/blog_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -27,7 +28,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool isLoading = true;
   List<Map<String, dynamic>> allEvents = [];
   List<Map<String, dynamic>> filteredEvents = [];
-  List<Map<String, dynamic>> blogs = [];
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
   int _currentEventIndex = 0;
@@ -35,7 +35,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    print('_HomeScreenState initState started.'); // Log khi initState bắt đầu
+    print('Calling loadData from initState.'); // Log trước khi gọi loadData
     loadData();
+    print('_HomeScreenState initState finished.'); // Log khi initState kết thúc
   }
 
   Future<Map<String, String>> _getAuthHeaders() async {
@@ -60,10 +63,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> loadData() async {
+    print('loadData method started in HomeScreen.');
     try {
       setState(() => isLoading = true);
 
       // Load events
+      print('Starting event loading section...'); // Log before event loading
       try {
         final headers = await _getAuthHeaders();
         final eventResponse = await http.get(
@@ -77,7 +82,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (eventResponse.statusCode == 200) {
           final eventData = jsonDecode(eventResponse.body)['data'] as List;
 
-          // Fix URL cho tất cả resource của event
+          // Fix URL for all event resources
           for (var event in eventData) {
             if (event['resources_data'] != null &&
                 event['resources_data'] is List) {
@@ -101,6 +106,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             allEvents = sortedEvents.take(5).toList();
             filteredEvents = allEvents;
           });
+          print(
+              'Event loading section finished successfully.'); // Log after successful event loading
         } else {
           print('Error loading events: ${eventResponse.statusCode}');
           print('Error response: ${eventResponse.body}');
@@ -108,56 +115,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             allEvents = [];
             filteredEvents = [];
           });
+          print(
+              'Event loading section finished with API error.'); // Log after API error in event loading
         }
       } catch (e) {
-        print('Error loading events: $e');
+        print('Error loading events in HomeScreen: $e');
         setState(() {
           allEvents = [];
           filteredEvents = [];
         });
-      }
-
-      // Load blogs
-      try {
-        final headers = {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        };
-
-        final blogResponse = await http.get(
-          Uri.parse(api_getblog),
-          headers: headers,
-        );
-
-        print('Blog Response Status: ${blogResponse.statusCode}');
-        print('Blog Response Body: ${blogResponse.body}');
-
-        if (blogResponse.statusCode == 200) {
-          final blogData =
-              jsonDecode(blogResponse.body)['blogs']['data'] as List;
-          final sortedBlogs = List<Map<String, dynamic>>.from(
-            blogData.map((item) => Map<String, dynamic>.from(item as Map)),
-          )..sort((a, b) {
-              final dateA = DateTime.parse(a['created_at'] ?? '');
-              final dateB = DateTime.parse(b['created_at'] ?? '');
-              return dateB.compareTo(dateA);
-            });
-
-          setState(() {
-            blogs = sortedBlogs.take(5).toList();
-          });
-        } else {
-          print('Error loading blogs: ${blogResponse.statusCode}');
-          print('Error response: ${blogResponse.body}');
-          setState(() {
-            blogs = [];
-          });
-        }
-      } catch (e) {
-        print('Error loading blogs: $e');
-        setState(() {
-          blogs = [];
-        });
+        print(
+            'Event loading section finished with exception.'); // Log after exception in event loading
       }
     } catch (e) {
       print("Error in loadData: $e");
@@ -182,7 +150,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('_HomeScreenState build method called.'); // Log khi build được gọi
     final themeState = ref.watch(themeProvider);
+    // Watch the blog list from the provider
+    final blogList = ref.watch(blogListProvider);
+
+    // Select the latest 5 blogs
+    final latestBlogs = blogList.take(5).toList();
 
     return Scaffold(
       drawer: const DrawerCustom(),
@@ -293,7 +267,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -303,27 +277,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                   ),
-                  TextButton(
-                    onPressed: () {
-                      // TODO: Navigate to all blogs
-                    },
-                    child: Text(
-                      'Xem tất cả',
-                      style: TextStyle(color: Theme.of(context).primaryColor),
+                  if (latestBlogs.isNotEmpty)
+                    TextButton(
+                      onPressed: () {
+                        // TODO: Navigate to all blogs
+                      },
+                      child: Text(
+                        'Xem tất cả',
+                        style: TextStyle(color: Theme.of(context).primaryColor),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
           ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                return _buildBlogCard(blogs[index], Theme.of(context));
-              },
-              childCount: blogs.length,
+          if (isLoading)
+            SliverToBoxAdapter(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+            )
+          else if (latestBlogs.isEmpty)
+            SliverToBoxAdapter(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    'Không có bài viết nào',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ),
+            )
+          else
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  if (index >= latestBlogs.length) return null;
+                  final blog = latestBlogs[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 8.0),
+                    child: _buildBlogCard(blog, Theme.of(context)),
+                  );
+                },
+                childCount: latestBlogs.length,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -422,25 +425,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildBlogCard(Map<String, dynamic> blog, ThemeData theme) {
+  Widget _buildBlogCard(BlogApproved blog, ThemeData theme) {
+    print('Building Blog Card for blog ID: ${blog.id}');
     String? imageUrl;
-    if (blog['resources_data'] != null && blog['resources_data'] is List) {
-      final image = (blog['resources_data'] as List).firstWhere(
-        (e) => e['type']?.toString().startsWith('image/') ?? false,
-        orElse: () => <String, dynamic>{},
-      );
-      if (image != null) {
-        print('Original URL: ${image['url']}');
-        imageUrl = fixImageUrl(image['url']);
-        print('Fixed URL: ${fixImageUrl(image['url'])}');
-      }
-    } else if (blog['photo'] != null && blog['photo'].toString().isNotEmpty) {
-      imageUrl = fixImageUrl(blog['photo']);
+    if (blog.photo.isNotEmpty) {
+      imageUrl = fixImageUrl(blog.photo);
     }
 
-    final content = blog['content'];
+    final content = blog.content;
     final String safeContent;
-    if (content is String) {
+    if (content.isNotEmpty) {
       safeContent = content.replaceAll(RegExp(r'<[^>]*>'), '');
     } else {
       safeContent = '';
@@ -448,25 +442,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 0,
+      elevation: 2,
       color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.withOpacity(0.1)),
       ),
       child: InkWell(
         onTap: () {
-          final parsedBlog = BlogApproved.fromJson(blog);
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => BlogDetailScreen(
-                blog: parsedBlog,
+                blog: blog,
               ),
             ),
           );
         },
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.all(12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -476,12 +468,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: imageUrl != null && imageUrl.isNotEmpty
                     ? CachedNetworkImage(
                         imageUrl: imageUrl,
-                        width: 80,
-                        height: 80,
+                        width: 100,
+                        height: 100,
                         fit: BoxFit.cover,
                         placeholder: (context, url) => Container(
-                          width: 80,
-                          height: 80,
+                          width: 100,
+                          height: 100,
                           color: Colors.grey[200],
                           child: const Center(
                             child: CircularProgressIndicator(),
@@ -491,19 +483,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           print('Error loading blog image: $error');
                           print('Failed URL: $url');
                           return Container(
-                            width: 80,
-                            height: 80,
+                            width: 100,
+                            height: 100,
                             color: Colors.grey[200],
                             child: const Icon(Icons.broken_image,
                                 color: Colors.grey),
                           );
                         },
-                        memCacheWidth: 300,
-                        memCacheHeight: 300,
                       )
                     : Container(
-                        width: 80,
-                        height: 80,
+                        width: 100,
+                        height: 100,
                         color: Colors.grey[200],
                         child: Icon(
                           Icons.article_outlined,
@@ -517,7 +507,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      blog['title'] ?? 'Không tiêu đề',
+                      blog.title.isNotEmpty ? blog.title : 'Không tiêu đề',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -526,15 +516,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Text(
-                      safeContent,
+                      safeContent.isNotEmpty ? safeContent : 'Không nội dung',
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.access_time, size: 14, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatDate(blog.createdAt.toIso8601String()),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

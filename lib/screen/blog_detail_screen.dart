@@ -15,6 +15,7 @@ import '../widgets/user_profile.dart';
 import '../providers/comment_provider.dart';
 import '../models/comment.dart';
 import '../providers/blog_detail_provider.dart' hide blogRepositoryProvider;
+import 'dart:convert';
 
 String getFullPhotoUrl(String? url) {
   if (url == null || url.isEmpty || url == 'null') {
@@ -224,7 +225,7 @@ class BlogDetailScreen extends ConsumerWidget {
 
                 return _buildInteractionButton(
                   icon: blog.is_liked ? Icons.favorite : Icons.favorite_border,
-                  label: 'Thích (${blog.likes_count})',
+                  label: 'Thích (${blog.countLike})',
                   iconColor: blog.is_liked ? Colors.red : Colors.grey[700],
                   onTap: () async {
                     try {
@@ -232,12 +233,27 @@ class BlogDetailScreen extends ConsumerWidget {
                           await blogRepository.toggleLikeBlog(blog.id);
                       if (response.statusCode >= 200 &&
                           response.statusCode < 300) {
-                        ref.invalidate(blogDetailProvider);
+                        final responseData = json.decode(response.body);
+                        // Cập nhật trạng thái like trong provider
+                        final bool isNowLiked =
+                            responseData['is_liked'] ?? false;
+                        final int currentLikesCount =
+                            responseData['likes_count'] ?? 0;
+                        print(
+                            'API response for like/unlike: is_liked=$isNowLiked, likes_count=$currentLikesCount'); // Debug print
+                        ref.read(blogDetailProvider.notifier).updateLikeStatus(
+                              blog.id,
+                              isNowLiked,
+                              currentLikesCount,
+                            );
 
                         if (context.mounted) {
+                          // Hiển thị thông báo cụ thể hơn
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Thao tác like thành công!')),
+                            SnackBar(
+                                content: Text(isNowLiked
+                                    ? 'Đã thích bài viết!'
+                                    : 'Đã bỏ thích bài viết!')),
                           );
                         }
                       } else {
